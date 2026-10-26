@@ -39,18 +39,30 @@ from kivy.core.window import Window
 from kivy.metrics import dp
 from kivy.properties import (BooleanProperty, ListProperty, NumericProperty,
                              StringProperty)
-from kivy.uix.screenmanager import ScreenManager, Screen, SlideTransition
+from kivy.uix.screenmanager import ScreenManager, Screen, FadeTransition
 
 # ── KivyMD ──────────────────────────────────────────────────────────────────
 from kivymd.app import MDApp
 from kivymd.uix.boxlayout import MDBoxLayout
 
 import theme as T
-from widgets import GlassCard, MeshBackground, Pressable, PressCard
+from widgets import GlassCard, MeshBackground, Pressable, PressCard, SnapshotBackground
+import remote_config
+import notifications
 
 # ---------------------------------------------------------------- OPCIONES
-SHOW_DESKTOP_CTA = False   # True -> agrega la tarjeta "¿No iniciaste sesión?"
+SHOW_DESKTOP_CTA = False   # Default Local -> True = agrega "¿No iniciaste sesión?"
 ENTRY_ANIMATION = True     # animación de entrada al abrir la app
+
+# -------------------------------------------------------- REMOTE CONFIG
+# URL real en GitHub (raw) del JSON que arma remote_config.fetch(). Al
+# iniciar, la app YA se ve completa con SHOW_DESKTOP_CTA/RECENT de arriba
+# (Default Local); si esta URL responde, sus valores los reemplazan sin
+# reiniciar la app (Activate). Si no hay internet o el archivo no existe
+# todavia en GitHub, la app sigue igual, sin trabarse (Fallback) -- ver
+# remote_config.py y InterfazRRHHApp._apply_remote_config().
+REMOTE_CONFIG_URL = ('https://raw.githubusercontent.com/zikness/FirmApp/'
+                      'main/remote/config.json')
 
 # ------------------------------------------------------------------- DATOS
 # (Igual que en la diapositiva del taller: esto es la "interconexion" de
@@ -302,18 +314,38 @@ class SuccessScreen(Screen):
 class RootScreen(MeshBackground):
     """Contenido del tablero (Inicio). Puebla las listas dinamicas (datos,
     no diseno). No es la Screen en si -- HomeScreen la envuelve en el .kv --
-    para poder reutilizar tal cual toda la logica de animacion de entrada."""
+    para poder reutilizar tal cual toda la logica de animacion de entrada.
+
+    banner_text y los metodos set_desktop_cta_visible()/set_max_recent()
+    son el punto donde Remote Config conecta con la pantalla: arrancan con
+    el valor local (Default) y InterfazRRHHApp los vuelve a llamar si llega
+    una configuracion remota valida (ver _apply_remote_config() mas abajo).
+    """
+    banner_text = StringProperty('')   # vacio = el banner no se muestra
 
     def on_kv_post(self, base_widget):
         for doc in PENDING:
             self.ids.pending_box.add_widget(PendingCard(**doc))
-        n = len(RECENT)
-        for i, doc in enumerate(RECENT):
-            self.ids.docs_box.add_widget(DocRow(last=(i == n - 1), **doc))
-        if SHOW_DESKTOP_CTA:
-            self.ids.extra_box.add_widget(DesktopCtaCard())
+        self.set_max_recent(len(RECENT))
+        self.set_desktop_cta_visible(SHOW_DESKTOP_CTA)
         if ENTRY_ANIMATION:
             Clock.schedule_once(self._entry_animation, 0)
+
+    def set_desktop_cta_visible(self, visible):
+        """Feature flag remoto: muestra/oculta 'Firmar sin sesión' sin
+        reiniciar la app."""
+        self.ids.extra_box.clear_widgets()
+        if visible:
+            self.ids.extra_box.add_widget(DesktopCtaCard())
+
+    def set_max_recent(self, n):
+        """Limite numerico remoto: cuantas 'Liquidaciones Recientes' se
+        listan (siempre sobre los mismos datos de RECENT)."""
+        docs = RECENT[:max(0, n)]
+        self.ids.docs_box.clear_widgets()
+        total = len(docs)
+        for i, doc in enumerate(docs):
+            self.ids.docs_box.add_widget(DocRow(last=(i == total - 1), **doc))
 
     def _entry_animation(self, dt):
         widgets = list(self.ids.col.children)[::-1]
@@ -355,33 +387,78 @@ class InterfazRRHHApp(MDApp):
         # Cada pantalla se crea una sola vez y persiste durante toda la
         # sesion; navegar solo cambia cual esta visible (sm.current), no
         # crea ni destruye widgets como hacia el modal original.
-        self.sm = ScreenManager()
+        self.sm = ScreenManager(transition=FadeTransition(duration=0.16))
         self.home_screen = HomeScreen(name='home')
         self.sign_screen = SignScreen(name='sign')
         self.success_screen = SuccessScreen(name='success')
         for screen in (self.home_screen, self.sign_screen, self.success_screen):
             self.sm.add_widget(screen)
+
+        # Remote Config: la app ya arranco completa con los valores locales
+        # (SHOW_DESKTOP_CTA, RECENT) -- este fetch es "best effort" en
+        # segundo plano y puede llegar antes o despues de que el usuario ya
+        # este mirando la pantalla. Si falla, no pasa nada (ver
+        # remote_config.py y _apply_remote_config() mas abajo).
+        remote_config.fetch(REMOTE_CONFIG_URL, on_loaded=self._apply_remote_config)
+
+        # Notificaciones (Plyer): si al abrir la app ya hay un documento
+        # urgente, se avisa una vez al sistema operativo -- el mismo lugar
+        # donde iria una notificacion push real si el proyecto tuviera
+        # backend.
+        if any(doc.get('urgent') for doc in PENDING):
+            notifications.notify(
+                'Tienes documentos urgentes',
+                'Hay %d documento(s) pendiente(s) por firmar.' %
+                sum(1 for d in PENDING if d.get('urgent')))
+
         return self.sm
+
+    def _apply_remote_config(self, cfg):
+        """Se llama SOLO si remote_config.fetch() trajo un JSON valido
+        (Activate). Si nunca se llama -- sin internet, servidor caido, JSON
+        todavia no existe en GitHub -- la app sigue con lo que ya tenia
+        (Fallback), sin que haga falta ningun 'else' aqui."""
+        dashboard = self.home_screen.ids.dashboard
+        dashboard.banner_text = cfg['banner_message']
+        dashboard.set_desktop_cta_visible(cfg['show_desktop_cta'])
+        dashboard.set_max_recent(cfg['max_recent_docs'])
 
     # --------------------------------------------------------- navegacion
     def go_to_sign(self, doc_type, title, deadline, pages):
         """Inicio -> Firmar. Llamado desde 'Firmar con 1 toque' / 'Firmar'."""
+        self._snapshot_home()
         self.sign_screen.load_document(doc_type, title, deadline, pages)
-        self.sm.transition = SlideTransition(direction='left')
         self.sm.current = 'sign'
 
     def go_to_success(self, doc_title):
         """Firmar -> Exito. Llamado por SignPanel.sign()."""
         self.success_screen.doc_title = doc_title
-        self.sm.transition = SlideTransition(direction='up')
+        # Reusa la misma foto del Dashboard que ya tiene SignScreen, para
+        # que el fondo oscurecido no "salte" entre una pantalla y la otra.
+        self.success_screen.ids.bg_image.set_texture(self.sign_screen.ids.bg_image.get_texture())
         self.sm.current = 'success'
+        notifications.notify('Documento firmado',
+                             '%s se firmó correctamente.' % doc_title)
 
     def go_home(self):
         """Firmar o Exito -> Inicio. Cierra el flujo de firma sin guardar
         nada (la maqueta no persiste datos)."""
-        direction = 'down' if self.sm.current == 'success' else 'right'
-        self.sm.transition = SlideTransition(direction=direction)
         self.sm.current = 'home'
+
+    def _snapshot_home(self):
+        """Foto del Dashboard tal como se ve justo antes de ir a Firmar, para
+        pintarla (oscurecida) detras de la tarjeta -- el efecto 'modal
+        flotante sobre fondo oscurecido' de la v1, pero sin volver a crear
+        y destruir un overlay cada vez (lo que causaba la fuga de memoria
+        de antes): HomeScreen nunca se destruye, solo se fotografia."""
+        imagen = self.home_screen.export_as_image()
+        textura = imagen.texture
+        # El Fbo que usa export_as_image() entrega la textura con el eje Y
+        # invertido (un detalle conocido de Kivy); se corrige una sola vez
+        # aqui, en el punto de captura -- go_to_success() reutiliza esta
+        # misma textura ya corregida, sin volver a tocarla.
+        textura.flip_vertical()
+        self.sign_screen.ids.bg_image.set_texture(textura)
 
 
 # Factory se usa para (a) instanciar desde Python las clases dinamicas
@@ -395,7 +472,7 @@ import widgets as _w  # noqa: E402
 for _cls in (_w.GlassCard, _w.DashedPanel, _w.PressCard, _w.GradientTile,
              _w.Icon, _w.Dot, _w.Divider, _w.SolidButton, _w.IconTile,
              _w.IconButton, _w.Pill, _w.RutInput, _w.SignaturePad,
-             _w.MeshBackground,
+             _w.MeshBackground, _w.SnapshotBackground,
              StatCard, QuickActionCard, SectionLabel, HeaderCard,
              PendingCard, DocRow, FooterCard, DesktopCtaCard,
              SignPanel, HomeScreen, SignScreen, SuccessScreen, RootScreen):

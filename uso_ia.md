@@ -45,6 +45,12 @@ aplica)".
    nombren las pantallas y componentes reales del código (`HomeScreen`,
    `SignScreen`, `SuccessScreen`, `SolidButton`/`MDCard`), sin alterar
    ningún dato de la investigación del estudiante.
+6. **"Vuelve a hacer el diseño de antes de las pantallas, implementa Remote
+   Config (con el PDF de la Sesión 22 como guía), encárgate de
+   notificaciones/alertas y Remote Config (no de JSON/persistencia, de eso
+   se encarga mi compañero), explica los cambios, y dime cómo subirlo al
+   repositorio para que mi compañero y el profesor puedan clonarlo sin
+   dificultad."** Ver sección "Actualización — Evaluación N°3" más abajo.
 
 ## Qué encontró el análisis inicial
 
@@ -171,10 +177,91 @@ que existe.
 - Criterio D (presentación oral, 15 pts): no aplica a un cambio de código;
   es responsabilidad del estudiante al exponer.
 
+## Actualización — Evaluación N°3: efecto visual, Remote Config y Notificaciones
+
+El estudiante compartió la rúbrica de la **Evaluación N°3** (Proyecto
+Práctico N°2: Diseño y estructura app Kivy) y la diapositiva de la
+**Sesión 22** (Remote Config, Notificaciones con Plyer), y pidió 3 cosas:
+
+1. **Recuperar el efecto visual de la v1** (modal flotante sobre el
+   Dashboard oscurecido) para `SignScreen`/`SuccessScreen`, que se había
+   perdido al convertirlas en pantallas de `ScreenManager` a toda pantalla.
+2. **Implementar Remote Config y Notificaciones** (los otros dos pilares —
+   persistencia JSON y autenticación — quedan fuera, a cargo de otro
+   integrante del equipo).
+3. Explicar los cambios y dejar instrucciones claras de Git para que el
+   equipo y el docente puedan clonar y ejecutar sin dificultades.
+
+Antes de tocar código se le preguntó explícitamente al estudiante (con el
+mecanismo de pregunta al usuario de Claude Code, no asumiendo) qué tan
+atrás quería revertir, porque la propia diapositiva de la Sesión 22 da por
+hecho que las rutas de `ScreenManager` ya existen ("Código Local
+(Estructural)" en la matriz de decisión de arquitectura) — es decir,
+deshacer el `ScreenManager` por completo habría contradicho el material de
+la propia sesión. Se acordó: mantener las 3 pantallas, pero reconstruir el
+efecto visual de modal flotante.
+
+### Efecto visual (sin volver al modal con fuga de memoria)
+
+`InterfazRRHHApp._snapshot_home()` toma una foto del Dashboard
+(`Widget.export_as_image()`) justo antes de navegar a Firmar, y
+`SnapshotBackground` (clase nueva en `widgets.py`) la pinta de fondo con un
+velo oscuro encima. **Se descartó deliberadamente** usar el widget `Image`
+de Kivy para esto: en las pruebas (ver abajo) se asignó `.texture`
+directamente y la imagen se renderizaba diminuta y mal ubicada, porque
+`Image` depende de cargar su textura a través de `source` para calcular
+correctamente su tamaño de render (`norm_image_size`). Se resolvió
+dibujando la textura a mano con `kivy.graphics.Rectangle`, el mismo patrón
+que ya usaba `MeshBackground` en este proyecto. También se detectó (y
+corrigió) que la textura de un `Fbo`/`export_as_image()` sale con el eje Y
+invertido en Kivy — se corrige una sola vez con `texture.flip_vertical()`
+en el punto de captura.
+
+### Remote Config (`remote_config.py` + `remote/config.json`)
+
+Sigue el patrón exacto de la diapositiva "Flujo Seguro y Resiliencia de
+Red": Default Local → Fetch Asíncrono (`UrlRequest`, no bloquea la UI) →
+Activate (si el JSON llega bien) o Fallback (si no hay red o falla, la app
+sigue con los valores locales sin interrumpir). Controla 3 parámetros:
+`banner_message` (texto), `show_desktop_cta` (feature flag) y
+`max_recent_docs` (límite numérico) — los mismos 3 tipos de ejemplo de la
+diapositiva.
+
+**El JSON no se alojó en un GitHub Gist** como sugiere la diapositiva:
+se intentó crear uno con la API de GitHub (`gh api -X POST gists`) y el
+proxy de esta sesión lo rechazó explícitamente (`403: Gist writes are not
+permitted through this proxy`). Se le avisó al estudiante y, con su
+aprobación, se usó la alternativa ya ofrecida de antemano: `remote/config.json`
+dentro del propio repositorio, servido vía la URL "raw" de GitHub
+(`raw.githubusercontent.com`) — cumple el mismo patrón cliente/servidor
+remoto sobre HTTP real, y además sirve para la "Modificación en vivo" de la
+defensa (criterio 4 de la rúbrica): basta editar ese archivo, hacer commit
+y push, sin tocar el código Python.
+
+### Notificaciones (`notifications.py`, Plyer)
+
+Envuelve `plyer.notification.notify()` en un `try/except` — una
+notificación nunca debe tumbar la app. Se dispara al abrir la app (si hay
+un documento urgente pendiente) y al firmar con éxito. Se agregó `plyer` a
+`requirements.txt`.
+
+### Cómo se probó
+
+Todo (snapshot del Dashboard, textura, velo oscuro, transición, Remote
+Config con fallback real porque `remote/config.json` todavía no estaba
+publicado en GitHub al momento de la prueba, y notificaciones) se corrió en
+un entorno sin pantalla (Xvfb), con capturas de pantalla reales en cada
+paso, antes de darlo por terminado. La falla de notificaciones en ese
+entorno (`No usable implementation found!`, por no tener `dbus`/
+`notify-send` instalados en el contenedor Linux) es esperada y no indica un
+problema de la app: en Windows, Plyer usa un backend nativo distinto
+(notificación de barra de tareas) que si debería funcionar.
+
 ## Cómo se usó el resultado
 
 Todo el código generado por la IA fue revisado, ejecutado y probado en este
 mismo proceso antes de darlo por válido (ver "Reestructuración a
-`ScreenManager`" arriba). El estudiante es responsable de revisar el diff
-final, entender los cambios y poder explicarlos en la presentación oral,
-como exige la rúbrica (D2 — "Fundamentación al exponer").
+`ScreenManager`" y "Actualización — Evaluación N°3" arriba). El estudiante
+es responsable de revisar el diff final, entender los cambios y poder
+explicarlos en la presentación oral, como exige la rúbrica (D2/criterio 1 —
+"Fundamentación al exponer" / "Defensa del código").

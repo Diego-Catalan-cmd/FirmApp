@@ -100,6 +100,46 @@ class MeshBackground(MDFloatLayout):
         self._rect.size = self.size
 
 
+class SnapshotBackground(MDFloatLayout):
+    """
+    Pinta una textura arbitraria de fondo (ej. una foto del Dashboard
+    tomada con Widget.export_as_image(), ver InterfazRRHHApp._snapshot_home
+    en main.py) con un velo oscuro semitransparente encima -- el efecto
+    "modal flotante sobre fondo oscurecido" de SignScreen/SuccessScreen.
+
+    No se usa el widget Image de Kivy para esto: Image espera cargar su
+    textura a traves de su propiedad `source` (un archivo), y asignarle
+    `.texture` a mano no actualiza su calculo interno de tamano de render
+    (`norm_image_size`), asi que la imagen terminaba dibujandose diminuta y
+    mal ubicada. Dibujar con kivy.graphics directamente (igual que
+    MeshBackground arriba) evita por completo ese problema.
+    """
+    def __init__(self, **kw):
+        super().__init__(**kw)
+        with self.canvas:
+            self._color = Color(1, 1, 1, 1)
+            self._rect = Rectangle(pos=self.pos, size=self.size)
+            Color(*T.rgba(T.TEXT, 0.45))
+            self._veil = Rectangle(pos=self.pos, size=self.size)
+        self.bind(pos=self._sync, size=self._sync)
+
+    def set_texture(self, texture):
+        """Reemplaza la foto de fondo. texture=None deja el area transparente
+        (antes de la primera foto, o si export_as_image llegara a fallar)."""
+        self._rect.texture = texture
+        self._color.a = 1 if texture is not None else 0
+
+    def get_texture(self):
+        """La textura actual, para pasarsela tal cual a otro
+        SnapshotBackground (ver InterfazRRHHApp.go_to_success en main.py,
+        que reusa la foto de SignScreen en vez de tomar una nueva)."""
+        return self._rect.texture
+
+    def _sync(self, *a):
+        self._rect.pos = self._veil.pos = self.pos
+        self._rect.size = self._veil.size = self.size
+
+
 # ============================================================== TARJETAS
 class GlassCard(MDBoxLayout):
     """

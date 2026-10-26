@@ -744,24 +744,45 @@
 # ella igual que hacia SignScreen y SuccessScreen.
 <HomeScreen>:
     RootScreen:
+        id: dashboard
 
 
 # =================================================================== FIRMAR
+# Efecto "modal flotante sobre fondo oscurecido" de la v1 (el que tenia el
+# SignatureModal + ModalOverlay originales), reconstruido sobre una Screen
+# real: InterfazRRHHApp.go_to_sign() toma una foto (export_as_image) del
+# HomeScreen justo antes de navegar y la deja en 'bg_image'; el Color
+# semitransparente se pinta encima (canvas.after de la imagen), y la
+# tarjeta de firma queda centrada arriba de todo -- igual que el modal
+# original, pero sin reintroducir el overlay que se crea/destruye cada vez
+# que se abre (la causa de la fuga de memoria que se corrigio antes).
 <SignScreen>:
-    MeshBackground:
+    FloatLayout:
+        SnapshotBackground:
+            id: bg_image
+            size_hint: 1, 1
+            pos_hint: {'x': 0, 'y': 0}
         MDAnchorLayout:
             anchor_x: 'center'
             anchor_y: 'center'
+            size_hint: 1, 1
+            pos_hint: {'x': 0, 'y': 0}
             SignPanel:
                 id: panel
 
 
 # ========================================================= PANTALLA DE EXITO
 <SuccessScreen>:
-    MeshBackground:
+    FloatLayout:
+        SnapshotBackground:
+            id: bg_image
+            size_hint: 1, 1
+            pos_hint: {'x': 0, 'y': 0}
         MDAnchorLayout:
             anchor_x: 'center'
             anchor_y: 'center'
+            size_hint: 1, 1
+            pos_hint: {'x': 0, 'y': 0}
             GlassCard:
                 orientation: 'vertical'
                 size_hint: None, None
@@ -828,6 +849,38 @@
             spacing: dp(14)
 
             HeaderCard:
+
+            # Banner de Remote Config: vacio por defecto (Default Local, ver
+            # RootScreen.banner_text en main.py). Si InterfazRRHHApp logra
+            # traer el JSON remoto, 'banner_message' llena este texto y la
+            # fila aparece sola -- sin que nadie la programe a mano, porque
+            # 'height'/'opacity' ya dependen de 'root.banner_text' aqui.
+            MDBoxLayout:
+                id: remote_banner
+                size_hint_y: None
+                height: dp(38) if root.banner_text else 0
+                opacity: 1 if root.banner_text else 0
+                padding: dp(14), 0
+                spacing: dp(8)
+                radius: dp(14)
+                md_bg_color: T.C_TINT_10
+                line_color: T.rgba(T.PRIMARY, .25)
+                line_width: 1.1
+                Icon:
+                    name: 'bell'
+                    color: T.C_PRIMARY
+                    size_hint: None, None
+                    size: dp(15), dp(15)
+                    pos_hint: {'center_y': .5}
+                TxtFijo:
+                    text: root.banner_text
+                    font_name: T.FONT
+                    font_size: sp(10.5)
+                    bold: True
+                    text_color: T.C_PRIMARY
+                    halign: 'left'
+                    text_size: self.width, None
+                    size_hint_x: 1
 
             MDGridLayout:
                 cols: 3

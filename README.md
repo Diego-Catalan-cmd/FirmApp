@@ -55,6 +55,10 @@ FirmApp/
 ├── widgets.py                 <- Clases base sobre MDBoxLayout / MDCard / MDTextField
 ├── icons.py                   <- Los iconos SVG del diseño, redibujados para Kivy
 ├── theme.py                   <- Colores y tipografías
+├── remote_config.py           <- Remote Config: fetch + fallback (UrlRequest)
+├── notifications.py           <- Notificaciones locales con Plyer
+├── remote/
+│   └── config.json             <- JSON remoto real, servido desde GitHub (raw)
 ├── requirements.txt
 ├── FUNDAMENTACION-UX-UI.md    <- Investigación de usuarios y matriz hallazgo → decisión
 ├── uso_ia.md                  <- Declaración de uso de IA (este proyecto)
@@ -62,6 +66,10 @@ FirmApp/
     ├── fonts/                  <- DMSans_18pt-{Regular,Bold}.ttf, JetBrainsMono-Regular.ttf
     └── screenshots/             <- Capturas usadas en este README
 ```
+
+> Este repositorio cubre **Notificaciones** y **Remote Config** (ver abajo).
+> Persistencia (JSON) y autenticación son responsabilidad de otro
+> integrante del equipo y no están en el alcance de estos archivos.
 
 ## Navegación (ScreenManager)
 
@@ -78,8 +86,58 @@ la evaluación:
 
 `InterfazRRHHApp.build()` crea las 3 pantallas una sola vez dentro de un
 `ScreenManager` y la navegación (`go_to_sign`, `go_to_success`, `go_home`)
-solo cambia `sm.current` con una transición (`SlideTransition`) — no crea ni
-destruye widgets en cada viaje, a diferencia del modal original.
+solo cambia `sm.current` — no crea ni destruye widgets en cada viaje.
+
+**Efecto visual "modal flotante"**: `SignScreen` y `SuccessScreen` recuperan
+el look de la v1 (tarjeta centrada sobre el Dashboard oscurecido) sin volver
+a un modal real: `InterfazRRHHApp._snapshot_home()` toma una foto del
+Dashboard (`Widget.export_as_image()`) justo antes de navegar y
+`SnapshotBackground` (`widgets.py`) la pinta de fondo con un velo oscuro
+encima. Se dibuja a mano con `kivy.graphics` (no con el widget `Image`)
+porque `Image` no recalcula bien su tamaño cuando se le asigna una textura
+sin pasar por su propiedad `source` — el mismo patrón que ya usa
+`MeshBackground` para el fondo degradado.
+
+## Remote Config
+
+`remote_config.py` separa 2 tipos de configuración (ver diapositiva "Código
+Local vs. Parámetros Remotos"):
+
+- **Código local (estructural):** las rutas del `ScreenManager`, qué clase
+  es cada pantalla — esto nunca cambia sin tocar el código.
+- **Parámetro remoto (dinámico):** `remote/config.json`, servido vía
+  `raw.githubusercontent.com` y leído con `kivy.network.urlrequest.UrlRequest`
+  (asíncrono, no congela la interfaz). Trae 3 valores:
+  - `banner_message` (string) — texto opcional bajo el saludo del Dashboard.
+  - `show_desktop_cta` (bool) — feature flag: enciende/apaga la tarjeta
+    "Firmar sin sesión".
+  - `max_recent_docs` (int) — límite numérico de liquidaciones a listar.
+
+Flujo seguro (nunca confiar en la red):
+1. **Default local** — la app arranca completa con `SHOW_DESKTOP_CTA` y
+   `RECENT` de `main.py`, sin esperar a la red.
+2. **Fetch asíncrono** — `InterfazRRHHApp.build()` llama
+   `remote_config.fetch(...)` en segundo plano.
+3. **Activate** — si el JSON llega bien, `_apply_remote_config()` actualiza
+   `RootScreen` (`banner_text`, `set_desktop_cta_visible()`,
+   `set_max_recent()`) y la UI se repinta sola (son `Property` de Kivy).
+4. **Fallback** — si no hay red, el archivo no existe o viene mal formado,
+   no se llama a nada y la app sigue con el Default local, sin trabarse.
+
+Para cambiar un valor remoto en vivo (por ejemplo, en la "Modificación en
+vivo" de la defensa): edita `remote/config.json`, haz commit y push a
+`main` — la próxima vez que se abra la app (sin recompilar nada), toma el
+nuevo valor.
+
+## Notificaciones (Plyer)
+
+`notifications.py` envuelve `plyer.notification.notify()` (notificación
+nativa del sistema operativo — en Windows, en Android, etc., con el mismo
+código Python) en un `try/except`: una notificación nunca debe tumbar la
+app ni interrumpir el flujo de firma, pase lo que pase con el sistema
+operativo. Se dispara en 2 momentos:
+- Al abrir la app, si hay algún documento `urgent` pendiente.
+- Al firmar un documento con éxito (`InterfazRRHHApp.go_to_success()`).
 
 ## 2. Instalación en Visual Studio Code
 
@@ -210,3 +268,61 @@ puntos fueron necesarios para conservar el diseño de Figma:
   `self.radius[0]` para calcular la sombra.
 - `GradientTile` usa `tile_radius` en vez de `radius` para no chocar con la
   propiedad nativa de KivyMD.
+
+## 10. Trabajo en equipo (clonar, ejecutar, subir cambios)
+
+El repositorio **no incluye** `.venv/` ni `__pycache__/` (ver `.gitignore`):
+cada integrante crea su propio entorno virtual localmente.
+
+### Clonar y ejecutar por primera vez
+
+```powershell
+git clone https://github.com/zikness/FirmApp.git
+cd FirmApp
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1          # macOS/Linux: source .venv/bin/activate
+pip install -r requirements.txt
+python main.py
+```
+
+Requiere **Python 3.10 u 11** (KivyMD 1.2.0 no funciona con 3.13).
+
+### Antes de empezar a trabajar cada día
+
+```powershell
+git pull origin main
+```
+
+Si cambió `requirements.txt` desde la última vez (por ejemplo, se agregó
+`plyer`), vuelve a instalar dependencias:
+```powershell
+pip install -r requirements.txt
+```
+
+### Para subir cambios
+
+```powershell
+git add .
+git commit -m "Descripcion corta del cambio"
+git pull origin main        # trae lo nuevo del otro antes de subir
+git push origin main
+```
+
+Si `git pull` muestra un editor pidiendo un mensaje de merge, solo guarda y
+cierra (`Ctrl+O`, Enter, `Ctrl+X` en el editor que abra VS Code/nano) — no
+hace falta escribir nada especial.
+
+### Reglas para no pisarse el trabajo
+
+- **Nunca** agregues `.venv/`, `__pycache__/` ni archivos `.pyc` al commit
+  (`.gitignore` ya los bloquea; si `git status` los muestra igual, es que
+  ya estaban trackeados de antes — avisen y se limpia una vez).
+- Si cada uno trabaja en un archivo distinto (por ejemplo, tú en
+  `remote_config.py`/`notifications.py` y tu compañero en el módulo de
+  persistencia JSON/login), los conflictos de Git son improbables. Si
+  ambos editan el mismo archivo el mismo día, hagan `git pull` seguido
+  antes de empezar a editar, para no divergir mucho.
+- Si `git push` es rechazado (`rejected: non-fast-forward`), es porque el
+  otro ya subió algo que tú no tienes — nunca uses `--force`; simplemente
+  `git pull origin main` primero (resuelve el merge si pide), y recién
+  ahí `git push origin main`.
