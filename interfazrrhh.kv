@@ -808,15 +808,16 @@
                         radius: dp(14)
                         padding: dp(6), dp(4)
                         TxtFijo:
-                            text: 'Ej: 12.345.678-9 o nombre@correo.com'
+                            text: 'RUT o correo'
                             font_name: T.FONT
-                            font_size: sp(12)
+                            font_size: sp(13)
                             text_color: T.rgba(T.SECONDARY, .55)
                             opacity: 0 if identifier.text else 1
-                            halign: 'center'
+                            halign: 'left'
                             valign: 'middle'
                             pos_hint: {'x': 0, 'y': 0}
                             size_hint: 1, 1
+                            padding: dp(16), 0
                             text_size: self.width, None
                         LoginIdentifierInput:
                             id: identifier
@@ -834,8 +835,8 @@
                             font_name: T.FONT
                             font_size: sp(16)
                             multiline: False
-                            halign: 'center'
-                            padding: dp(30), dp(17)
+                            halign: 'left'
+                            padding: dp(16), dp(17)
                             on_id_valid: root.set_id_valid(args[1])
                     MDFloatLayout:
                         id: id_check
@@ -881,6 +882,7 @@
                             pos_hint: {'x': 0, 'y': 0}
                             size_hint: 1, 1
                             password: True
+                            password_mask: u'•'
                             mode: 'round'
                             line_color_normal: 0, 0, 0, 0
                             line_color_focus: 0, 0, 0, 0
@@ -893,7 +895,7 @@
                             font_name: T.FONT
                             font_size: sp(22)
                             multiline: False
-                            halign: 'center'
+                            halign: 'left'
                             padding: dp(16), dp(14)
                             on_text: root.set_password_filled(self.text)
 
