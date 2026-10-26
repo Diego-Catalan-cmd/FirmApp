@@ -16,6 +16,8 @@ Este modulo no sabe nada de KivyMD ni de pantallas: solo pide un JSON y
 entrega un dict ya fusionado con los valores por defecto. Quien lo usa
 (main.py) decide que propiedades de la app actualizar con ese dict.
 """
+import json
+
 from kivy.network.urlrequest import UrlRequest
 from kivy.logger import Logger
 
@@ -50,6 +52,20 @@ def fetch(url, on_loaded, on_failed=None, timeout=6):
         nada mas para seguir funcionando).
     """
     def _aplicar(resultado):
+        # UrlRequest solo decodifica el JSON solo si el servidor responde
+        # con el header 'Content-Type: application/json'. GitHub (raw.
+        # githubusercontent.com) sirve los .json como 'text/plain', asi que
+        # aqui llega como texto plano -- se intenta decodificar a mano
+        # antes de rendirse.
+        if isinstance(resultado, (str, bytes)):
+            try:
+                resultado = json.loads(resultado)
+            except ValueError:
+                Logger.warning('RemoteConfig: la respuesta no es JSON valido '
+                                '-- se ignora y se mantiene el valor local')
+                if on_failed:
+                    on_failed()
+                return
         if not isinstance(resultado, dict):
             Logger.warning('RemoteConfig: la respuesta no es un objeto JSON '
                             '-- se ignora y se mantiene el valor local')
