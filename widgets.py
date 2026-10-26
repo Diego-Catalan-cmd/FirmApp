@@ -618,16 +618,28 @@ class LoginIdentifierInput(MDTextField):
     def set_text(self, instance_text_field, text):
         """Reemplaza a set_text() de MDTextField -- mismo motivo que en
         RutInput: evitar la validacion/animacion de Material, que entra en
-        recursion al reformatear el texto aqui mismo."""
+        recursion al reformatear el texto aqui mismo.
+
+        El autoformateo de RUT SOLO se aplica si, hasta ahora, todo lo
+        escrito podria ser parte de un RUT (digitos, puntos, guion o K).
+        En cuanto aparece cualquier otra letra -- osea, el usuario esta
+        escribiendo un correo y todavia no llega al '@' -- se deja el
+        texto tal cual, sin tocarlo. Sin este chequeo, format_rut()
+        borraba cada letra apenas se escribia (por ejemplo, 'v', 'a',
+        'l'... de 'valentina@...') porque esas letras no son digitos ni
+        'K' y el formateador las descartaba de inmediato.
+        """
         if self._busy:
             return
         self._busy = True
         if '@' not in text:
-            formatted = RutInput.format_rut(text)
-            if formatted != text:
-                self.text = formatted
-                self.cursor = (len(formatted), 0)
-                text = formatted
+            parece_rut = all(c.isdigit() or c in '.-kK' for c in text)
+            if parece_rut:
+                formatted = RutInput.format_rut(text)
+                if formatted != text:
+                    self.text = formatted
+                    self.cursor = (len(formatted), 0)
+                    text = formatted
         kind, valid = identify(text)
         self.kind = kind or ''
         self.valid = bool(valid)

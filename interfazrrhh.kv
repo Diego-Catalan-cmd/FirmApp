@@ -862,7 +862,7 @@
                             size: dp(12), dp(12)
                             pos_hint: {'center_x': .5, 'center_y': .5}
                 Txt:
-                    text: 'Correo detectado' if identifier.kind == 'email' else ('RUT detectado' if identifier.kind == 'rut' else ' ')
+                    text: (('RUT válido' if identifier.valid else 'RUT inválido: revisa el dígito verificador') if identifier.kind == 'rut' else (('Correo válido' if identifier.valid else 'Formato de correo inválido') if identifier.kind == 'email' else ' '))
                     font_size: sp(9)
                     text_color: T.C_PRIMARY if identifier.valid else T.rgba(T.ORANGE, .9)
                     opacity: 1 if identifier.text else 0
