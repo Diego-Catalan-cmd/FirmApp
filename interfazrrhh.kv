@@ -807,37 +807,44 @@
                         line_width: 1.8
                         radius: dp(14)
                         padding: dp(6), dp(4)
-                        TxtFijo:
-                            text: 'RUT o correo'
-                            font_name: T.FONT
-                            font_size: sp(13)
-                            text_color: T.rgba(T.SECONDARY, .55)
-                            opacity: 0 if identifier.text else 1
-                            halign: 'left'
-                            valign: 'middle'
-                            pos_hint: {'x': 0, 'y': 0}
-                            size_hint: 1, 1
-                            padding: dp(16), 0
-                            text_size: self.width, None
-                        LoginIdentifierInput:
-                            id: identifier
-                            pos_hint: {'x': 0, 'y': 0}
-                            size_hint: 1, 1
-                            mode: 'round'
-                            line_color_normal: 0, 0, 0, 0
-                            line_color_focus: 0, 0, 0, 0
-                            fill_color_normal: 0, 0, 0, 0
-                            fill_color_focus: 0, 0, 0, 0
-                            foreground_color: T.C_TEXT
-                            text_color_normal: T.C_TEXT
-                            text_color_focus: T.C_TEXT
-                            cursor_color: T.C_PRIMARY
-                            font_name: T.FONT
-                            font_size: sp(16)
-                            multiline: False
-                            halign: 'left'
-                            padding: dp(16), dp(17)
-                            on_id_valid: root.set_id_valid(args[1])
+                        MDFloatLayout:
+                            # Envoltorio clave: dentro de un MDBoxLayout (la
+                            # caja de arriba) dos hijos se reparten el ancho
+                            # en vez de superponerse -- por eso el campo real
+                            # solo ocupaba la mitad derecha. Un MDFloatLayout
+                            # SI permite superponer el placeholder y el campo
+                            # (mismo patron que el campo de RUT en Firmar).
+                            TxtFijo:
+                                text: 'RUT o correo'
+                                font_name: T.FONT
+                                font_size: sp(13)
+                                text_color: T.rgba(T.SECONDARY, .55)
+                                opacity: 0 if identifier.text else 1
+                                halign: 'left'
+                                valign: 'middle'
+                                pos_hint: {'x': 0, 'y': 0}
+                                size_hint: 1, 1
+                                padding: dp(16), 0
+                                text_size: self.width, None
+                            LoginIdentifierInput:
+                                id: identifier
+                                pos_hint: {'x': 0, 'y': 0}
+                                size_hint: 1, 1
+                                mode: 'round'
+                                line_color_normal: 0, 0, 0, 0
+                                line_color_focus: 0, 0, 0, 0
+                                fill_color_normal: 0, 0, 0, 0
+                                fill_color_focus: 0, 0, 0, 0
+                                foreground_color: T.C_TEXT
+                                text_color_normal: T.C_TEXT
+                                text_color_focus: T.C_TEXT
+                                cursor_color: T.C_PRIMARY
+                                font_name: T.FONT
+                                font_size: sp(16)
+                                multiline: False
+                                halign: 'left'
+                                padding: dp(16), dp(17)
+                                on_id_valid: root.set_id_valid(args[1])
                     MDFloatLayout:
                         id: id_check
                         opacity: 1 if (identifier.text and identifier.valid) else 0
