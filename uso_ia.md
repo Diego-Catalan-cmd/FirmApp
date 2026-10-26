@@ -51,6 +51,11 @@ aplica)".
    se encarga mi compañero), explica los cambios, y dime cómo subirlo al
    repositorio para que mi compañero y el profesor puedan clonarlo sin
    dificultad."** Ver sección "Actualización — Evaluación N°3" más abajo.
+7. **"Implementa un login, manteniendo el diseño de la app en general, el
+   login debe verificar que sea un rut válido o en su defecto un correo
+   (con el formato, es decir nombre@gmail.com). Actualiza también el
+   archivo de uso_ia.md con todos los cambios nuevos y solicitados."** Ver
+   sección "Actualización — Pantalla de Login" más abajo.
 
 ## Qué encontró el análisis inicial
 
@@ -257,11 +262,94 @@ entorno (`No usable implementation found!`, por no tener `dbus`/
 problema de la app: en Windows, Plyer usa un backend nativo distinto
 (notificación de barra de tareas) que si debería funcionar.
 
+## Actualización — Pantalla de Login
+
+El estudiante pidió una pantalla de inicio de sesión, "manteniendo el
+diseño de la app en general", que valide un RUT chileno válido o, en su
+defecto, un correo con formato `nombre@dominio.com`, y que se dejara
+registrado todo en este archivo.
+
+### Dónde quedó cada parte
+
+- **`validators.py`** (nuevo, archivo completo): funciones puras (sin
+  nada de Kivy) para validar RUT y correo:
+  - `is_valid_rut()` calcula el **dígito verificador real** del RUT
+    (algoritmo módulo 11 — cada dígito del cuerpo, de derecha a
+    izquierda, se multiplica por un factor de 2 a 7 que vuelve a
+    empezar en 2; el DV es 11 menos el resto de esa suma dividida
+    por 11). Esto corrige una limitación que ya se había señalado en
+    el análisis inicial del proyecto: antes (`RutInput` en la pantalla
+    de Firmar) solo se validaba el **largo** del RUT, no el dígito
+    verificador — por ejemplo `11.111.111-2` pasaba como válido antes,
+    y con esta función no. `RutInput` (la firma de un documento ya
+    elegido) se dejó tal cual estaba, sin tocar: la pantalla de Login es
+    la que ahora hace la validación real.
+  - `is_valid_email()` valida la forma `nombre@dominio.tld` con una
+    expresión regular, tal como se pidió explícitamente
+    ("con el formato, es decir nombre@gmail.com").
+  - `identify()` combina ambas: si el texto tiene `@` lo trata como
+    correo, si no, como RUT.
+  - Se probaron a mano con RUTs de prueba conocidos (`12345678-5`,
+    `11.111.111-1`, `7654321-6` válidos; `11.111.111-2` inválido) y
+    varios correos válidos/inválidos antes de usarlas en la interfaz.
+- **`widgets.py`**: dos clases nuevas, `LoginIdentifierInput` (el campo
+  único que acepta RUT o correo, se autoformatea como RUT mientras no
+  tenga `@`, y llama a `validators.identify()` en cada tecla) y
+  `PasswordInput` (campo de contraseña enmascarado, sin validación real
+  — solo necesita no estar vacío).
+- **`main.py`**: `LoginScreen` (nueva pantalla del `ScreenManager`,
+  ahora la primera que se muestra al abrir la app) habilita el botón
+  "Ingresar" solo cuando el identificador es válido y la contraseña
+  tiene 4+ caracteres. `login()` navega a Inicio — es una maqueta, no
+  hay backend que autentique nada de verdad, tal como el resto del
+  proyecto; se dejó un comentario explícito en el código marcando ese
+  método como el punto exacto donde conectar una autenticación real.
+- **`interfazrrhh.kv`**: regla `<LoginScreen>:` nueva, con el mismo
+  lenguaje visual que el resto de la app (`GlassCard` sobre
+  `MeshBackground`, recuadros redondeados propios en vez de los de
+  Material, el mismo patrón de check verde que ya usaba la pestaña de
+  RUT en Firmar) — cumpliendo el pedido de "mantener el diseño de la
+  app en general".
+
+### Un bug real que se encontró y corrigió probando
+
+Al probar la pantalla, el texto "RUT detectado"/"Correo detectado" se
+quedaba congelado con su primer valor aunque el usuario siguiera
+escribiendo. La causa: `kind` y `valid` en `LoginIdentifierInput`
+se habían escrito como atributos Python comunes (`self.kind = None`),
+no como `Property` de Kivy -- y el `.kv` no puede reaccionar de forma
+confiable a cambios en algo que no es una `Property` observable. Se
+corrigió convirtiéndolas en `StringProperty`/`BooleanProperty` reales.
+Se verificó con un script que inspecciona el widget directamente (no solo
+mirando capturas de pantalla) que el texto ya cambia correctamente al
+escribir.
+
+### Cómo se probó
+
+En el mismo entorno sin pantalla (Xvfb) usado para el resto del proyecto:
+escribir un RUT con dígito verificador incorrecto (botón sigue
+deshabilitado), corregirlo a uno válido (aparece el check y "RUT
+detectado"), agregar una contraseña (se habilita "Ingresar"), borrar y
+escribir un correo válido (cambia a "Correo detectado"), y presionar
+"Ingresar" (navega a Inicio). Después se corrió el flujo completo de
+punta a punta: Login → Inicio → Firmar → Éxito → Inicio, para confirmar
+que agregar el Login no rompió nada de lo anterior.
+
+### Qué queda fuera, a propósito
+
+Esta pantalla **valida formato**, no identidad: no hay backend, no hay
+usuarios reales, cualquier RUT con dígito verificador correcto o
+cualquier correo con forma válida "inicia sesión". Eso es justamente lo
+que el estudiante pidió que quedara fuera (persistencia/autenticación
+real, a cargo de su compañero). `LoginScreen.login()` queda documentado
+en el código como el lugar exacto para conectar eso despues.
+
 ## Cómo se usó el resultado
 
 Todo el código generado por la IA fue revisado, ejecutado y probado en este
 mismo proceso antes de darlo por válido (ver "Reestructuración a
-`ScreenManager`" y "Actualización — Evaluación N°3" arriba). El estudiante
-es responsable de revisar el diff final, entender los cambios y poder
-explicarlos en la presentación oral, como exige la rúbrica (D2/criterio 1 —
-"Fundamentación al exponer" / "Defensa del código").
+`ScreenManager`", "Actualización — Evaluación N°3" y "Actualización —
+Pantalla de Login" arriba). El estudiante es responsable de revisar el
+diff final, entender los cambios y poder explicarlos en la presentación
+oral, como exige la rúbrica (D2/criterio 1 — "Fundamentación al exponer" /
+"Defensa del código").

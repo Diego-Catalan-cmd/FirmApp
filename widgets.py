@@ -37,6 +37,7 @@ from kivymd.uix.widget import MDWidget
 
 import theme as T
 from icons import ICONS, STROKE
+from validators import identify
 
 
 # ============================================================== TEXTURAS
@@ -566,6 +567,92 @@ class RutInput(MDTextField):
         self.valid = None if not clean else len(clean) >= 8
         self.dispatch('on_rut_valid', self.valid)
         self._busy = False
+
+
+# ======================================================= CAMPOS DE LOGIN
+class LoginIdentifierInput(MDTextField):
+    """
+    Campo unico de inicio de sesion: acepta un RUT chileno O un correo, y
+    los distingue solo. Mientras el texto no tenga '@' se formatea como
+    RUT en vivo igual que RutInput (12.345.678-9); apenas aparece un '@'
+    se deja de formatear, porque ya es un correo. La validacion real (DV
+    del RUT con modulo 11, o forma de correo) vive en validators.py, no
+    aqui -- este campo solo la llama y la muestra.
+
+    'valid' y 'kind' son Properties de Kivy (no atributos sueltos, a
+    diferencia de RutInput.valid) a proposito: interfazrrhh.kv las lee
+    directamente (identifier.valid, identifier.kind) para pintar el borde,
+    el check y el texto "RUT detectado"/"Correo detectado" -- si fueran
+    atributos normales, Kivy no podria enlazarlas de forma confiable (sin
+    ellas como Property, esos textos se quedaban congelados con el primer
+    valor, un bug real que aparecio al probar esta pantalla).
+
+    Tambien dispara on_id_valid(bool), que SignScreen/LoginScreen usan para
+    habilitar el boton -- igual que on_rut_valid en RutInput.
+    """
+    valid = BooleanProperty(False)
+    kind = StringProperty('')   # '', 'rut' o 'email'
+
+    def __init__(self, **kw):
+        super().__init__(**kw)
+        self._busy = False
+        self.register_event_type('on_id_valid')
+
+    def on_id_valid(self, valid):
+        pass
+
+    # Mismo motivo que en RutInput.set_default_colors(): ver su docstring
+    # mas arriba en este archivo -- sin esto KivyMD rellena con colores del
+    # tema Material en vez de dejar transparente el recuadro propio.
+    def set_default_colors(self, interval, updated=False):
+        self._hint_text_color = self.hint_text_color_normal
+        self._text_color_normal = self.text_color_normal
+        self._fill_color = self.fill_color_normal
+        self._line_color_normal = self.line_color_normal
+        self._line_color_focus = self.line_color_focus
+        self._icon_right_color = self.icon_right_color_normal
+        self._icon_left_color = self.icon_left_color_normal
+        self._max_length_text_color = [0, 0, 0, 0]
+        self._helper_text_color = [0, 0, 0, 0]
+
+    def set_text(self, instance_text_field, text):
+        """Reemplaza a set_text() de MDTextField -- mismo motivo que en
+        RutInput: evitar la validacion/animacion de Material, que entra en
+        recursion al reformatear el texto aqui mismo."""
+        if self._busy:
+            return
+        self._busy = True
+        if '@' not in text:
+            formatted = RutInput.format_rut(text)
+            if formatted != text:
+                self.text = formatted
+                self.cursor = (len(formatted), 0)
+                text = formatted
+        kind, valid = identify(text)
+        self.kind = kind or ''
+        self.valid = bool(valid)
+        self.dispatch('on_id_valid', self.valid)
+        self._busy = False
+
+
+class PasswordInput(MDTextField):
+    """
+    Campo de contrasena generico (solo visual: no hay backend real que
+    autentique nada, ver login() en main.py). Sobre MDTextField para poder
+    usar `password: True` (el enmascarado nativo de KivyMD), con el mismo
+    ajuste de colores de RutInput/LoginIdentifierInput para que el
+    recuadro redondeado propio del diseno no se pinte con el tema Material.
+    """
+    def set_default_colors(self, interval, updated=False):
+        self._hint_text_color = self.hint_text_color_normal
+        self._text_color_normal = self.text_color_normal
+        self._fill_color = self.fill_color_normal
+        self._line_color_normal = self.line_color_normal
+        self._line_color_focus = self.line_color_focus
+        self._icon_right_color = self.icon_right_color_normal
+        self._icon_left_color = self.icon_left_color_normal
+        self._max_length_text_color = [0, 0, 0, 0]
+        self._helper_text_color = [0, 0, 0, 0]
 
 
 # ========================================================== LIENZO DE FIRMA

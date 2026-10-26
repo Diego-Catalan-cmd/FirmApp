@@ -27,9 +27,9 @@ directos.
 
 ## Capturas de pantalla
 
-| Inicio | Firmar — RUT | Firmar — Dibujo | Éxito |
-|---|---|---|---|
-| ![Inicio](assets/screenshots/01_inicio.png) | ![Firmar con RUT](assets/screenshots/02_firmar_rut.png) | ![Dibujar firma](assets/screenshots/03_firmar_dibujo.png) | ![Firmado con éxito](assets/screenshots/04_exito.png) |
+| Login | Inicio | Firmar — RUT | Firmar — Dibujo | Éxito |
+|---|---|---|---|---|
+| ![Login](assets/screenshots/00_login.png) | ![Inicio](assets/screenshots/01_inicio.png) | ![Firmar con RUT](assets/screenshots/02_firmar_rut.png) | ![Dibujar firma](assets/screenshots/03_firmar_dibujo.png) | ![Firmado con éxito](assets/screenshots/04_exito.png) |
 
 ## Fundamentación UX/UI
 
@@ -50,9 +50,10 @@ qué se cambió y por qué — está documentado en [`uso_ia.md`](uso_ia.md).
 ```
 FirmApp/
 ├── main.py                    <- SOLO clases y lógica (hereda de MDApp)
-│                                  ScreenManager + 3 pantallas: Inicio, Firmar, Éxito
+│                                  ScreenManager + 4 pantallas: Login, Inicio, Firmar, Éxito
 ├── interfazrrhh.kv            <- TODO el diseño visual (componentes KivyMD)
 ├── widgets.py                 <- Clases base sobre MDBoxLayout / MDCard / MDTextField
+├── validators.py              <- Validación de RUT (dígito verificador) y correo
 ├── icons.py                   <- Los iconos SVG del diseño, redibujados para Kivy
 ├── theme.py                   <- Colores y tipografías
 ├── remote_config.py           <- Remote Config: fetch + fallback (UrlRequest)
@@ -67,16 +68,19 @@ FirmApp/
     └── screenshots/             <- Capturas usadas en este README
 ```
 
-> Este repositorio cubre **Notificaciones** y **Remote Config** (ver abajo).
-> Persistencia (JSON) y autenticación son responsabilidad de otro
-> integrante del equipo y no están en el alcance de estos archivos.
+> Este repositorio cubre **Login (validación de formato)**, **Notificaciones**
+> y **Remote Config** (ver abajo). La persistencia real de datos (JSON) y la
+> autenticación contra un backend real son responsabilidad de otro
+> integrante del equipo y no están en el alcance de estos archivos — ver
+> "Login" más abajo para el límite exacto de lo que sí hace.
 
 ## Navegación (ScreenManager)
 
 La maqueta original no tenía `ScreenManager`: era una sola pantalla con un
-modal superpuesto. Se reestructuró a 3 pantallas navegables, tal como exige
+modal superpuesto. Se reestructuró a 4 pantallas navegables, tal como exige
 la evaluación:
 
+0. **`login`** (`LoginScreen`) — primera pantalla: RUT o correo + contraseña.
 1. **`home`** (`HomeScreen`) — tablero: saludo, estadísticas, acciones
    rápidas, tareas pendientes y liquidaciones recientes.
 2. **`sign`** (`SignScreen`) — tarjeta de firma con dos pestañas (RUT /
@@ -84,9 +88,30 @@ la evaluación:
 3. **`success`** (`SuccessScreen`) — confirmación de firma, con botón para
    volver a Inicio.
 
-`InterfazRRHHApp.build()` crea las 3 pantallas una sola vez dentro de un
-`ScreenManager` y la navegación (`go_to_sign`, `go_to_success`, `go_home`)
-solo cambia `sm.current` — no crea ni destruye widgets en cada viaje.
+`InterfazRRHHApp.build()` crea las 4 pantallas una sola vez dentro de un
+`ScreenManager` (arranca en `login`) y la navegación
+(`go_to_home_after_login`, `go_to_sign`, `go_to_success`, `go_home`) solo
+cambia `sm.current` — no crea ni destruye widgets en cada viaje.
+
+## Login
+
+`LoginScreen` tiene un solo campo de identificador (`LoginIdentifierInput`,
+`widgets.py`) que acepta **RUT o correo** y los distingue solo (si el texto
+tiene `@` es correo; si no, se formatea como RUT en vivo, igual que en la
+pantalla de Firmar). La validación real vive en `validators.py` — funciones
+puras, sin nada de Kivy, fáciles de ubicar y de explicar en la defensa:
+
+- **RUT:** calcula el **dígito verificador real** (algoritmo módulo 11),
+  no solo el largo — `11.111.111-1` es válido, `11.111.111-2` no.
+- **Correo:** exige la forma `nombre@dominio.tld` (al menos un punto en el
+  dominio, con un TLD de 2+ letras) — `nombre@gmail.com` sí,
+  `nombre@gmail` no.
+
+El botón "Ingresar" se habilita solo cuando el identificador es válido **y**
+la contraseña tiene 4+ caracteres. Es una maqueta: **no hay backend que
+autentique nada de verdad** — `LoginScreen.login()` es el punto exacto
+donde el equipo conectaría una autenticación real más adelante, en vez de
+navegar directo a Inicio.
 
 **Efecto visual "modal flotante"**: `SignScreen` y `SuccessScreen` recuperan
 el look de la v1 (tarjeta centrada sobre el Dashboard oscurecido) sin volver

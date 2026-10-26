@@ -284,11 +284,45 @@ class SignPanel(GlassCard):
 
 
 # ============================================================ PANTALLAS (SCREENS)
-# Las 3 pantallas navegables que exige la maqueta: Inicio, Firmar y Exito.
+# Las 4 pantallas navegables de la maqueta: Login, Inicio, Firmar y Exito.
 # Cada una es una kivy.uix.screenmanager.Screen; el ScreenManager (creado en
 # InterfazRRHHApp.build()) las muestra/oculta con una transicion animada al
 # cambiar 'sm.current'. El diseno de cada pantalla vive en su regla
 # <XScreen>: de interfazrrhh.kv -- aqui solo la logica de navegacion.
+
+class LoginScreen(Screen):
+    """
+    Pantalla 'Iniciar sesion' -- la primera que ve el usuario. Valida el
+    identificador (RUT chileno con digito verificador real, o correo con
+    formato nombre@dominio.com -- ver validators.py) y una contrasena no
+    vacia, y habilita 'Ingresar' solo cuando ambos son validos.
+
+    Es una maqueta: no hay backend que autentique nada de verdad (ver el
+    encabezado de main.py). login() es el punto exacto donde conectar una
+    autenticacion real mas adelante -- en vez de navegar directo a Inicio,
+    llamaria a un servicio y reaccionaria a su respuesta.
+    """
+    def on_kv_post(self, base_widget):
+        self._id_valid = False
+        self._password_ok = False
+        self._refresh_cta()
+
+    def set_id_valid(self, valid):
+        self._id_valid = bool(valid)
+        self._refresh_cta()
+
+    def set_password_filled(self, text):
+        self._password_ok = len(text) >= 4
+        self._refresh_cta()
+
+    def _refresh_cta(self):
+        ok = getattr(self, '_id_valid', False) and getattr(self, '_password_ok', False)
+        self.ids.cta.set_enabled(ok)
+
+    def login(self):
+        """Solo visual: no autentica nada real. Navega a Inicio."""
+        MDApp.get_running_app().go_to_home_after_login()
+
 
 class HomeScreen(Screen):
     """Pantalla 'Inicio': envuelve el tablero (RootScreen) sin logica propia."""
@@ -383,15 +417,18 @@ class InterfazRRHHApp(MDApp):
         Window.clearcolor = T.rgba(T.BG)
 
         # ScreenManager con las 3 pantallas navegables de la maqueta:
-        # Inicio (tablero) -> Firmar (RUT / dibujar firma) -> Exito.
+        # Login -> Inicio (tablero) -> Firmar (RUT / dibujar firma) -> Exito.
         # Cada pantalla se crea una sola vez y persiste durante toda la
         # sesion; navegar solo cambia cual esta visible (sm.current), no
-        # crea ni destruye widgets como hacia el modal original.
+        # crea ni destruye widgets como hacia el modal original. LoginScreen
+        # se agrega primero -> es la que el ScreenManager muestra al abrir.
         self.sm = ScreenManager(transition=FadeTransition(duration=0.16))
+        self.login_screen = LoginScreen(name='login')
         self.home_screen = HomeScreen(name='home')
         self.sign_screen = SignScreen(name='sign')
         self.success_screen = SuccessScreen(name='success')
-        for screen in (self.home_screen, self.sign_screen, self.success_screen):
+        for screen in (self.login_screen, self.home_screen,
+                       self.sign_screen, self.success_screen):
             self.sm.add_widget(screen)
 
         # Remote Config: la app ya arranco completa con los valores locales
@@ -400,16 +437,6 @@ class InterfazRRHHApp(MDApp):
         # este mirando la pantalla. Si falla, no pasa nada (ver
         # remote_config.py y _apply_remote_config() mas abajo).
         remote_config.fetch(REMOTE_CONFIG_URL, on_loaded=self._apply_remote_config)
-
-        # Notificaciones (Plyer): si al abrir la app ya hay un documento
-        # urgente, se avisa una vez al sistema operativo -- el mismo lugar
-        # donde iria una notificacion push real si el proyecto tuviera
-        # backend.
-        if any(doc.get('urgent') for doc in PENDING):
-            notifications.notify(
-                'Tienes documentos urgentes',
-                'Hay %d documento(s) pendiente(s) por firmar.' %
-                sum(1 for d in PENDING if d.get('urgent')))
 
         return self.sm
 
@@ -424,6 +451,20 @@ class InterfazRRHHApp(MDApp):
         dashboard.set_max_recent(cfg['max_recent_docs'])
 
     # --------------------------------------------------------- navegacion
+    def go_to_home_after_login(self):
+        """Login -> Inicio. Llamado por LoginScreen.login()."""
+        self.sm.current = 'home'
+        # Notificaciones (Plyer): si al entrar ya hay un documento urgente,
+        # se avisa una vez al sistema operativo -- el mismo lugar donde
+        # iria una notificacion push real si el proyecto tuviera backend.
+        # Va aqui (despues de "iniciar sesion") y no en build(), porque no
+        # tendria sentido notificar antes de que el usuario se identifique.
+        if any(doc.get('urgent') for doc in PENDING):
+            notifications.notify(
+                'Tienes documentos urgentes',
+                'Hay %d documento(s) pendiente(s) por firmar.' %
+                sum(1 for d in PENDING if d.get('urgent')))
+
     def go_to_sign(self, doc_type, title, deadline, pages):
         """Inicio -> Firmar. Llamado desde 'Firmar con 1 toque' / 'Firmar'."""
         self._snapshot_home()
@@ -473,9 +514,11 @@ for _cls in (_w.GlassCard, _w.DashedPanel, _w.PressCard, _w.GradientTile,
              _w.Icon, _w.Dot, _w.Divider, _w.SolidButton, _w.IconTile,
              _w.IconButton, _w.Pill, _w.RutInput, _w.SignaturePad,
              _w.MeshBackground, _w.SnapshotBackground,
+             _w.LoginIdentifierInput, _w.PasswordInput,
              StatCard, QuickActionCard, SectionLabel, HeaderCard,
              PendingCard, DocRow, FooterCard, DesktopCtaCard,
-             SignPanel, HomeScreen, SignScreen, SuccessScreen, RootScreen):
+             SignPanel, LoginScreen, HomeScreen, SignScreen, SuccessScreen,
+             RootScreen):
     Factory.register(_cls.__name__, cls=_cls)
 
 
