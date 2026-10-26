@@ -73,17 +73,27 @@ La siguiente matriz conecta los resultados cuantitativos directos de la encuesta
 
 ## 4. Justificación de la Estructura de la App y Navegación (Subcriterio A4 — 3 pts)
 
-La arquitectura de información de **FirmApp** responde a la necesidad de **rapidez e inmediatez** expresada por los usuarios (donde el 54,6 % calificó de difícil su sistema actual). La app se organiza con `kivy.uix.screenmanager.ScreenManager` en 3 pantallas, en un flujo lineal Inicio → Firmar → Éxito (`InterfazRRHHApp.go_to_sign()` / `go_to_success()` / `go_home()`, con transición `SlideTransition`):
+La arquitectura de información de **FirmApp** responde a la necesidad de **rapidez e inmediatez** expresada por los usuarios (donde el 54,6 % calificó de difícil su sistema actual). La app se organiza con `kivy.uix.screenmanager.ScreenManager` en 4 pantallas, en un flujo lineal Login → Inicio → Firmar → Éxito (`InterfazRRHHApp.go_to_home_after_login()` / `go_to_sign()` / `go_to_success()` / `go_home()`, con transición `FadeTransition`):
 
-1. **Pantalla Principal / Dashboard (`HomeScreen`):**
+1. **Pantalla de Inicio de Sesión (`LoginScreen`):**
+   * **Objetivo:** Identificar al trabajador con su RUT o correo (`LoginIdentifierInput`, con validación real del dígito verificador del RUT o formato de correo — ver `validators.py`) y una contraseña, antes de mostrar cualquier documento.
+   * **Razón de UX:** Esta pantalla no proviene de un hallazgo puntual de la encuesta (la investigación se centró en el trámite de firma, no en el control de acceso), sino de un requisito funcional de la evaluación: controlar quién entra a sus propios documentos antes de nada. Se resolvió con **un solo campo** que acepta RUT o correo indistintamente — coherente con la prioridad de simplicidad que sí mostró la encuesta (72,7 % exige "de un toque", 36,4 % rechaza procesos largos): no se obliga al trabajador a recordar cuál de los dos usó para registrarse.
+2. **Pantalla Principal / Dashboard (`HomeScreen`):**
    * **Objetivo:** Mostrar de forma inmediata el listado de `PENDING` (documentos por firmar) y `RECENT` (liquidaciones ya firmadas), además de los accesos directos de "Acciones Rápidas".
    * **Razón de UX:** Responde al **72,7 %** que busca firmar rápido y al **36,4 %** que necesita saber qué tiene pendiente apenas abre la aplicación.
-2. **Pantalla de Firma (`SignScreen`):**
+3. **Pantalla de Firma (`SignScreen`):**
    * **Objetivo:** Confirmar la identidad e ingresar la firma del documento elegido en Inicio, con dos formas a elección: pestaña **"Ingresar RUT"** (formato automático `12.345.678-9`, `RutInput`) o pestaña **"Dibujar Firma"** (lienzo táctil, `SignaturePad`).
    * **Razón de UX:** Responde al **72,7 %** que exige firmar "de un toque" — reduce el trámite a un único paso adicional después de tocar "Firmar" en el Dashboard, sin campos ni pantallas de más.
-3. **Pantalla de Confirmación (`SuccessScreen`):**
+4. **Pantalla de Confirmación (`SuccessScreen`):**
    * **Objetivo:** Mostrar la confirmación visual de que la firma se realizó, con botón para volver a Inicio.
    * **Razón de UX:** Da certeza al usuario de que el documento fue firmado correctamente, eliminando la incertidumbre del correo o el papel (hallazgo del 18,2 % que reporta PDFs perdidos en el correo).
+
+> **Nota sobre `LoginScreen`:** es una maqueta sin backend — no autentica
+> contra ningún sistema real, solo valida el **formato** del RUT/correo
+> (dígito verificador real, pero sin verificar que esa persona exista).
+> `LoginScreen.login()` en `main.py` queda documentado como el punto donde
+> conectar una autenticación real más adelante, responsabilidad de otro
+> integrante del equipo (ver `uso_ia.md`).
 
 ---
 
