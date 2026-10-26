@@ -27,9 +27,9 @@ directos.
 
 ## Capturas de pantalla
 
-| Login | Inicio | Firmar — RUT | Firmar — Dibujo | Éxito |
-|---|---|---|---|---|
-| ![Login](assets/screenshots/00_login.png) | ![Inicio](assets/screenshots/01_inicio.png) | ![Firmar con RUT](assets/screenshots/02_firmar_rut.png) | ![Dibujar firma](assets/screenshots/03_firmar_dibujo.png) | ![Firmado con éxito](assets/screenshots/04_exito.png) |
+| Login | Inicio | Firmar — RUT | Firmar — Dibujo | Éxito | Notificaciones |
+|---|---|---|---|---|---|
+| ![Login](assets/screenshots/00_login.png) | ![Inicio](assets/screenshots/01_inicio.png) | ![Firmar con RUT](assets/screenshots/02_firmar_rut.png) | ![Dibujar firma](assets/screenshots/03_firmar_dibujo.png) | ![Firmado con éxito](assets/screenshots/04_exito.png) | ![Notificaciones](assets/screenshots/05_notificaciones.png) |
 
 ## Fundamentación UX/UI
 
@@ -163,6 +163,23 @@ app ni interrumpir el flujo de firma, pase lo que pase con el sistema
 operativo. Se dispara en 2 momentos:
 - Al abrir la app, si hay algún documento `urgent` pendiente.
 - Al firmar un documento con éxito (`InterfazRRHHApp.go_to_success()`).
+
+**Centro de notificaciones en la app** (`NotificationOverlay`,
+`main.py`): la notificación del sistema operativo es puntual y
+desaparece sola, así que el Dashboard también la deja visible "en
+grande" dentro de la propia app, para que el usuario la revise cuando
+quiera, no solo en el instante en que llegó:
+- El **banner naranja** bajo el saludo (visible solo si `Remote Config`
+  trajo un `banner_message`) es presionable — lo mismo que el **ícono de
+  campana** del encabezado, siempre visible.
+- Ambos abren el mismo aviso centrado (`InterfazRRHHApp.
+  show_notifications()`), con el mensaje del banner en grande y, si hay
+  documentos urgentes, cuántos son.
+- No es una pantalla del `ScreenManager` — es informativa y transitoria,
+  se agrega/quita de `HomeScreen` igual que el modal de la v1 (incluido
+  tocar afuera para cerrarla), pero sin su fuga de memoria original:
+  `Pressable` (`widgets.py`) ya desconecta su listener de `Window` al
+  salir del árbol de widgets.
 
 ## 2. Instalación en Visual Studio Code
 

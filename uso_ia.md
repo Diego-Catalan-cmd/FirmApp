@@ -56,6 +56,16 @@ aplica)".
    (con el formato, es decir nombre@gmail.com). Actualiza también el
    archivo de uso_ia.md con todos los cambios nuevos y solicitados."** Ver
    sección "Actualización — Pantalla de Login" más abajo.
+8. **"Actualiza FUNDAMENTACION-UX-UI.md. ¿Debo hacer clone de nuevo? ¿Cómo
+   actualizo el archivo en mi Visual?"** y, en mensajes separados, 4 rondas
+   de ajustes visuales/funcionales sobre el Login a partir de capturas
+   reales (centrado, tamaño de letra, puntos de la contraseña, el botón
+   "Ingresar" que no se habilitaba, y el bug real de no poder escribir un
+   correo) — ver sección "Actualización — Ajustes de la pantalla de Login"
+   más abajo.
+9. **"El apartado de la notificación debe ser más llamativo... que al
+   presionar [la campana] aparezca la notificación en grande."** Ver
+   sección "Actualización — Banner y campana de notificaciones" más abajo.
 
 ## Qué encontró el análisis inicial
 
@@ -343,6 +353,84 @@ cualquier correo con forma válida "inicia sesión". Eso es justamente lo
 que el estudiante pidió que quedara fuera (persistencia/autenticación
 real, a cargo de su compañero). `LoginScreen.login()` queda documentado
 en el código como el lugar exacto para conectar eso despues.
+
+## Actualización — Ajustes de la pantalla de Login (varias rondas)
+
+Tras ver capturas reales de la app corriendo en Windows, el estudiante
+pidió varias correcciones seguidas sobre el Login. Se documentan juntas
+porque cada una llevó a encontrar la siguiente:
+
+1. **"El apartado de rut/email está mal centrado, los puntos de la
+   contraseña más marcados y grandes, la tipografía más grande."**
+   Se subió el tamaño de fuente de ambos campos y se probó primero un
+   carácter de contraseña tipo círculo relleno (`●`, U+25CF) — se
+   verificó con la librería `fonttools` que la fuente DM Sans **no**
+   incluye ese glifo (se veía como un recuadro vacío) y se cambió a
+   asterisco (`*`), que sí está en la fuente.
+2. **"Sigue sin escribir a la izquierda" / no dejaba presionar
+   "Ingresar".** Se intentó centrar el texto (`halign: 'center'`), pero
+   resultó frágil: en cuanto el texto se acercaba al ancho del campo,
+   Kivy deja de centrar y sigue al cursor, empujando el texto a la
+   derecha. Se cambió a `halign: 'left'`. Sobre el botón: se verificó
+   con `validators.py` que el RUT de prueba usado por el estudiante
+   (`13.213.123-2`, luego `21.123.131-3`) **no era válido de verdad**
+   (dígito verificador incorrecto) — no era un bug, era la validación
+   funcionando. Se dejaron RUTs de prueba válidos en la respuesta al
+   estudiante.
+3. **Seguía sin verse bien alineado.** Se encontró la causa real
+   inspeccionando el ancho del widget en vivo: el placeholder y el campo
+   de texto estaban como hijos directos de un `MDBoxLayout` (que
+   **reparte** el ancho entre sus hijos), no de un `MDFloatLayout` (que
+   los **superpone**) — el campo de escritura real solo ocupaba la mitad
+   derecha de la caja. Se agregó el `MDFloatLayout` intermedio que
+   faltaba, el mismo patrón que ya usa el campo de RUT de la pantalla de
+   Firmar.
+4. **"Que me permita ingresar un correo o un rut, el botón no
+   funciona."** Bug real y serio, encontrado al simular tecleo
+   caracter-por-caracter con `insert_text()` (como escribe Kivy de
+   verdad) en vez de asignar `.text` de una sola vez (como se había
+   probado antes, por lo que no se había detectado): el autoformateo de
+   RUT borraba cada letra de un correo apenas se escribía, porque
+   `format_rut()` descarta todo lo que no sea dígito o "K", y el campo
+   lo aplicaba a cualquier texto sin "@" — incluida la parte local de un
+   correo mientras el usuario todavía no llegaba al "@". Se corrigió
+   para que el autoformateo de RUT solo se aplique si **todo** lo
+   escrito hasta ese momento podría ser parte de un RUT. También se
+   cambió el mensaje "RUT detectado"/"Correo detectado" (ambiguo, no
+   decía si era válido) por "RUT válido"/"RUT inválido: revisa el
+   dígito verificador" (y su equivalente para correo).
+
+## Actualización — Banner y campana de notificaciones
+
+El estudiante pidió que el banner de Remote Config fuera "más llamativo"
+y que el ícono de campana del encabezado (hasta ahora decorativo)
+mostrara la notificación "en grande" al presionarlo.
+
+- `interfazrrhh.kv`: el banner cambió de un tinte celeste sutil a un
+  estilo naranja con borde, ícono en una insignia con degradado y una
+  flecha (`chevron`) indicando que es presionable — mismo lenguaje que
+  la etiqueta "Urgente" ya usada en las tarjetas pendientes.
+- `widgets.py`: nueva clase `PressableBox` (`Pressable` + `MDBoxLayout`)
+  para que el banner reaccione al toque igual que las tarjetas
+  (`PressCard`), sin la sombra/fondo de vidrio que trae `GlassCard`.
+- `main.py`: nueva clase `NotificationOverlay` — una superposición
+  liviana (no una `Screen` del `ScreenManager`, porque es informativa y
+  transitoria, no parte de la navegación) que muestra el mensaje del
+  banner en grande y, si hay documentos urgentes, cuántos. La abren
+  tanto el ícono de campana como el propio banner
+  (`InterfazRRHHApp.show_notifications()`/`hide_notifications()`).
+  Deliberadamente se reutilizó el patrón "modal con fondo oscuro" de la
+  v1 (`ModalOverlay`original, que se había quitado al pasar a
+  `ScreenManager`) porque aquí sí tiene sentido: es un aviso puntual, no
+  un paso del flujo de navegación. No reintroduce la fuga de memoria que
+  tenía el `ModalOverlay` original, porque `Pressable` (`widgets.py`) ya
+  desconecta su listener de `Window` al salir del árbol de widgets (fix
+  aplicado en la sesión de Remote Config/Notificaciones).
+
+Probado en el entorno sin pantalla (Xvfb): abrir con la campana, abrir
+tocando el banner, cerrar con el botón "Cerrar", y confirmado que
+`app.notification_overlay` queda en `None` después de cerrar (para que
+`show_notifications()` pueda volver a abrirlo).
 
 ## Cómo se usó el resultado
 

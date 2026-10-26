@@ -316,6 +316,13 @@ class PressCard(Pressable, GlassCard):
         Animation(shadow_strength=2.0 if hovering else 1.0, d=0.15).start(self)
 
 
+class PressableBox(Pressable, MDBoxLayout):
+    """MDBoxLayout comun (sin el fondo/sombra de GlassCard) que reacciona
+    al toque -- para filas simples que deben ser clicables, como el
+    banner de notificaciones del Dashboard."""
+    pass
+
+
 # ================================================================ ICONOS
 class Icon(MDWidget):
     """

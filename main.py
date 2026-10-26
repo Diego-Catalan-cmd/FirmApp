@@ -44,6 +44,7 @@ from kivy.uix.screenmanager import ScreenManager, Screen, FadeTransition
 # ── KivyMD ──────────────────────────────────────────────────────────────────
 from kivymd.app import MDApp
 from kivymd.uix.boxlayout import MDBoxLayout
+from kivymd.uix.floatlayout import MDFloatLayout
 
 import theme as T
 from widgets import GlassCard, MeshBackground, Pressable, PressCard, SnapshotBackground
@@ -395,6 +396,35 @@ class RootScreen(MeshBackground):
             0.45)
 
 
+# =================================================== AVISO DE NOTIFICACIONES
+class NotificationOverlay(MDFloatLayout):
+    """
+    Superposicion liviana que muestra, en grande, la notificacion actual
+    (el banner de Remote Config y/o el aviso de documentos urgentes). La
+    abre el boton de la campana de HeaderCard o el banner del Dashboard
+    (on_release: app.show_notifications()).
+
+    No es una Screen del ScreenManager -- es informativa y transitoria,
+    no forma parte del flujo de navegacion -- asi que se agrega/quita de
+    HomeScreen igual que el ModalOverlay de la v1, pero sin repetir su
+    fuga de memoria: Pressable (widgets.py) ya desconecta su listener de
+    Window al salir del arbol de widgets (ver on_parent en widgets.py).
+    """
+    message = StringProperty('')
+    urgent_count = NumericProperty(0)
+
+    def close(self):
+        MDApp.get_running_app().hide_notifications()
+
+    def on_touch_down(self, touch):
+        if super().on_touch_down(touch):
+            return True
+        if self.get_root_window() and not self.ids.card.collide_point(*touch.pos):
+            self.close()
+            return True
+        return True
+
+
 # ------------------------------------------------------------------- APP
 class InterfazRRHHApp(MDApp):
     """
@@ -430,6 +460,7 @@ class InterfazRRHHApp(MDApp):
         for screen in (self.login_screen, self.home_screen,
                        self.sign_screen, self.success_screen):
             self.sm.add_widget(screen)
+        self.notification_overlay = None
 
         # Remote Config: la app ya arranco completa con los valores locales
         # (SHOW_DESKTOP_CTA, RECENT) -- este fetch es "best effort" en
@@ -449,6 +480,30 @@ class InterfazRRHHApp(MDApp):
         dashboard.banner_text = cfg['banner_message']
         dashboard.set_desktop_cta_visible(cfg['show_desktop_cta'])
         dashboard.set_max_recent(cfg['max_recent_docs'])
+
+    # ---------------------------------------------------- notificaciones
+    def show_notifications(self):
+        """Abre el aviso grande de notificaciones (boton de campana del
+        Dashboard, o el banner de Remote Config). Si ya esta abierto, no
+        hace nada -- igual que open_modal() en la version anterior."""
+        if self.notification_overlay:
+            return
+        dashboard = self.home_screen.ids.dashboard
+        overlay = Factory.NotificationOverlay()
+        overlay.message = dashboard.banner_text
+        overlay.urgent_count = sum(1 for d in PENDING if d.get('urgent'))
+        self.notification_overlay = overlay
+        self.home_screen.add_widget(overlay)
+        overlay.opacity = 0
+        Animation(opacity=1, d=0.16, t='out_quad').start(overlay)
+
+    def hide_notifications(self):
+        if not self.notification_overlay:
+            return
+        overlay, self.notification_overlay = self.notification_overlay, None
+        anim = Animation(opacity=0, d=0.16, t='in_quad')
+        anim.bind(on_complete=lambda *a: self.home_screen.remove_widget(overlay))
+        anim.start(overlay)
 
     # --------------------------------------------------------- navegacion
     def go_to_home_after_login(self):
@@ -513,12 +568,12 @@ import widgets as _w  # noqa: E402
 for _cls in (_w.GlassCard, _w.DashedPanel, _w.PressCard, _w.GradientTile,
              _w.Icon, _w.Dot, _w.Divider, _w.SolidButton, _w.IconTile,
              _w.IconButton, _w.Pill, _w.RutInput, _w.SignaturePad,
-             _w.MeshBackground, _w.SnapshotBackground,
+             _w.MeshBackground, _w.SnapshotBackground, _w.PressableBox,
              _w.LoginIdentifierInput, _w.PasswordInput,
              StatCard, QuickActionCard, SectionLabel, HeaderCard,
              PendingCard, DocRow, FooterCard, DesktopCtaCard,
              SignPanel, LoginScreen, HomeScreen, SignScreen, SuccessScreen,
-             RootScreen):
+             RootScreen, NotificationOverlay):
     Factory.register(_cls.__name__, cls=_cls)
 
 
