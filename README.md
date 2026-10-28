@@ -27,9 +27,9 @@ directos.
 
 ## Capturas de pantalla
 
-| Login | Inicio | Firmar — RUT | Firmar — Dibujo | Éxito | Notificaciones |
-|---|---|---|---|---|---|
-| ![Login](assets/screenshots/00_login.png) | ![Inicio](assets/screenshots/01_inicio.png) | ![Firmar con RUT](assets/screenshots/02_firmar_rut.png) | ![Dibujar firma](assets/screenshots/03_firmar_dibujo.png) | ![Firmado con éxito](assets/screenshots/04_exito.png) | ![Notificaciones](assets/screenshots/05_notificaciones.png) |
+| Login | Registro | Inicio | Firmar — RUT | Firmar — Dibujo | Éxito | Notificaciones |
+|---|---|---|---|---|---|---|
+| ![Login](assets/screenshots/00_login.png) | ![Registro](assets/screenshots/00b_registro.png) | ![Inicio](assets/screenshots/01_inicio.png) | ![Firmar con RUT](assets/screenshots/02_firmar_rut.png) | ![Dibujar firma](assets/screenshots/03_firmar_dibujo.png) | ![Firmado con éxito](assets/screenshots/04_exito.png) | ![Notificaciones](assets/screenshots/05_notificaciones.png) |
 
 ## Fundamentación UX/UI
 
@@ -40,66 +40,83 @@ diseño están en [`FUNDAMENTACION-UX-UI.md`](FUNDAMENTACION-UX-UI.md).
 
 ## Declaración de uso de IA
 
-Se usó IA (Claude / Claude Code) para analizar el proyecto, corregir errores
-y adaptar la estructura a los requisitos de la evaluación (navegación con
-`ScreenManager`, orden del repositorio). El detalle completo — qué se pidió,
-qué se cambió y por qué — está documentado en [`uso_ia.md`](uso_ia.md).
+Se usó IA (Claude / Claude Code) en el desarrollo de este proyecto. La
+declaración completa — herramienta, modelo, prompts, qué se tomó y qué se
+descartó, qué se ajustó y por qué, y una reflexión — está en
+[`USO_IA.md`](USO_IA.md), como exige la evaluación.
+
+## Servicios implementados (dónde está cada uno)
+
+La evaluación pide demostrar 4 servicios integrados. Esta tabla es el mapa
+rápido para la defensa ("¿dónde está...?"):
+
+| Servicio | Archivo(s) | Punto de entrada |
+|---|---|---|
+| **Autenticación** (registro + login) | `main.py` (`LoginScreen`, `RegisterScreen`), `data_manager.py` | `LoginScreen.login()` llama a `DataManager.authenticate()`; `RegisterScreen.register()` llama a `DataManager.register_user()` |
+| **Persistencia en JSON** | `data_manager.py`, carpeta `data/` (se crea sola, no se versiona) | `DataManager.save_documents()` / `load_documents()` — `usuarios.json` y `documentos.json` |
+| **Notificaciones** | `notifications.py`, `main.py` | `InterfazRRHHApp.go_to_home_after_login()` (documento urgente) y `.go_to_success()` (firma exitosa) llaman a `notifications.notify()` |
+| **Remote Config** | `remote_config.py`, `remote/config.json`, `main.py` | `InterfazRRHHApp.build()` llama a `remote_config.fetch()`; `_apply_remote_config()` aplica el resultado |
+
+Detalle de cada uno, con el razonamiento de diseño, en las secciones de
+abajo.
 
 ## 1. Estructura de archivos
 
 ```
 FirmApp/
 ├── main.py                    <- SOLO clases y lógica (hereda de MDApp)
-│                                  ScreenManager + 4 pantallas: Login, Inicio, Firmar, Éxito
+│                                  ScreenManager + 5 pantallas: Login, Registro,
+│                                  Inicio, Firmar, Éxito
 ├── interfazrrhh.kv            <- TODO el diseño visual (componentes KivyMD)
 ├── widgets.py                 <- Clases base sobre MDBoxLayout / MDCard / MDTextField
 ├── validators.py              <- Validación de RUT (dígito verificador) y correo
+├── data_manager.py            <- Persistencia en JSON: usuarios y documentos
 ├── icons.py                   <- Los iconos SVG del diseño, redibujados para Kivy
 ├── theme.py                   <- Colores y tipografías
 ├── remote_config.py           <- Remote Config: fetch + fallback (UrlRequest)
 ├── notifications.py           <- Notificaciones locales con Plyer
 ├── remote/
 │   └── config.json             <- JSON remoto real, servido desde GitHub (raw)
+├── data/                       <- (se crea sola al ejecutar; no se versiona)
+│   ├── usuarios.json            <- Cuentas registradas (contraseña con hash)
+│   └── documentos.json          <- Qué está PENDING / qué pasó a RECENT
 ├── requirements.txt
 ├── FUNDAMENTACION-UX-UI.md    <- Investigación de usuarios y matriz hallazgo → decisión
-├── uso_ia.md                  <- Declaración de uso de IA (este proyecto)
+├── USO_IA.md                  <- Declaración de uso de IA (este proyecto)
 └── assets/
     ├── fonts/                  <- DMSans_18pt-{Regular,Bold}.ttf, JetBrainsMono-Regular.ttf
     └── screenshots/             <- Capturas usadas en este README
 ```
 
-> Este repositorio cubre **Login (validación de formato)**, **Notificaciones**
-> y **Remote Config** (ver abajo). La persistencia real de datos (JSON) y la
-> autenticación contra un backend real son responsabilidad de otro
-> integrante del equipo y no están en el alcance de estos archivos — ver
-> "Login" más abajo para el límite exacto de lo que sí hace.
-
 ## Navegación (ScreenManager)
 
 La maqueta original no tenía `ScreenManager`: era una sola pantalla con un
-modal superpuesto. Se reestructuró a 4 pantallas navegables, tal como exige
+modal superpuesto. Se reestructuró a 5 pantallas navegables, tal como exige
 la evaluación:
 
-0. **`login`** (`LoginScreen`) — primera pantalla: RUT o correo + contraseña.
-1. **`home`** (`HomeScreen`) — tablero: saludo, estadísticas, acciones
+0. **`login`** (`LoginScreen`) — primera pantalla: RUT o correo + contraseña,
+   validados de verdad contra las cuentas guardadas.
+1. **`register`** (`RegisterScreen`) — crear una cuenta nueva.
+2. **`home`** (`HomeScreen`) — tablero: saludo, estadísticas, acciones
    rápidas, tareas pendientes y liquidaciones recientes.
-2. **`sign`** (`SignScreen`) — tarjeta de firma con dos pestañas (RUT /
+3. **`sign`** (`SignScreen`) — tarjeta de firma con dos pestañas (RUT /
    Dibujar) para el documento elegido en Inicio.
-3. **`success`** (`SuccessScreen`) — confirmación de firma, con botón para
+4. **`success`** (`SuccessScreen`) — confirmación de firma, con botón para
    volver a Inicio.
 
-`InterfazRRHHApp.build()` crea las 4 pantallas una sola vez dentro de un
+`InterfazRRHHApp.build()` crea las 5 pantallas una sola vez dentro de un
 `ScreenManager` (arranca en `login`) y la navegación
-(`go_to_home_after_login`, `go_to_sign`, `go_to_success`, `go_home`) solo
-cambia `sm.current` — no crea ni destruye widgets en cada viaje.
+(`go_to_register`, `go_to_login`, `go_to_home_after_login`, `go_to_sign`,
+`go_to_success`, `go_home`) solo cambia `sm.current` — no crea ni destruye
+widgets en cada viaje.
 
-## Login
+## Autenticación: Login y Registro
 
-`LoginScreen` tiene un solo campo de identificador (`LoginIdentifierInput`,
-`widgets.py`) que acepta **RUT o correo** y los distingue solo (si el texto
-tiene `@` es correo; si no, se formatea como RUT en vivo, igual que en la
-pantalla de Firmar). La validación real vive en `validators.py` — funciones
-puras, sin nada de Kivy, fáciles de ubicar y de explicar en la defensa:
+`LoginScreen` y `RegisterScreen` comparten el mismo campo de identificador
+(`LoginIdentifierInput`, `widgets.py`) que acepta **RUT o correo** y los
+distingue solo (si el texto tiene `@` es correo; si no, se formatea como
+RUT en vivo, igual que en la pantalla de Firmar). La validación de
+**formato** vive en `validators.py` — funciones puras, sin nada de Kivy:
 
 - **RUT:** calcula el **dígito verificador real** (algoritmo módulo 11),
   no solo el largo — `11.111.111-1` es válido, `11.111.111-2` no.
@@ -107,11 +124,21 @@ puras, sin nada de Kivy, fáciles de ubicar y de explicar en la defensa:
   dominio, con un TLD de 2+ letras) — `nombre@gmail.com` sí,
   `nombre@gmail` no.
 
-El botón "Ingresar" se habilita solo cuando el identificador es válido **y**
-la contraseña tiene 4+ caracteres. Es una maqueta: **no hay backend que
-autentique nada de verdad** — `LoginScreen.login()` es el punto exacto
-donde el equipo conectaría una autenticación real más adelante, en vez de
-navegar directo a Inicio.
+Eso es solo el formato. La autenticación **real** (¿existe esa cuenta? ¿la
+contraseña es la correcta?) la hace `data_manager.py`:
+
+- **Registro** (`RegisterScreen.register()` → `DataManager.register_user()`):
+  guarda la cuenta nueva en `data/usuarios.json`, con la contraseña **con
+  hash** (SHA-256, no en texto plano), y entra directo a Inicio — registro
+  e ingreso combinados, como pide la evaluación.
+- **Login** (`LoginScreen.login()` → `DataManager.authenticate()`): compara
+  el identificador y el hash de la contraseña contra lo guardado. Si no
+  coincide, se avisa en pantalla (`auth_feedback`) sin navegar a ningún
+  lado — no es un error silencioso.
+- **Cuenta de prueba precargada:** `demo@firmapp.cl` / `demo1234` — se crea
+  sola la primera vez que se abre la app (si `data/usuarios.json` no
+  existe todavía), para no depender de registrarse antes de poder entrar
+  a hacer la demo.
 
 **Efecto visual "modal flotante"**: `SignScreen` y `SuccessScreen` recuperan
 el look de la v1 (tarjeta centrada sobre el Dashboard oscurecido) sin volver
@@ -122,6 +149,44 @@ encima. Se dibuja a mano con `kivy.graphics` (no con el widget `Image`)
 porque `Image` no recalcula bien su tamaño cuando se le asigna una textura
 sin pasar por su propiedad `source` — el mismo patrón que ya usa
 `MeshBackground` para el fondo degradado.
+
+## Persistencia de datos (JSON)
+
+`data_manager.py` (clase `DataManager`) guarda y recupera, en archivos
+JSON locales, los dos "datos críticos" de la app:
+
+- **`data/usuarios.json`** — cuentas registradas (ver "Autenticación"
+  arriba).
+- **`data/documentos.json`** — qué documentos siguen `PENDING` y cuáles ya
+  pasaron a `RECENT` (firmados).
+
+**Cuándo se escribe:** `SignPanel.sign()` (`main.py`) llama a
+`InterfazRRHHApp.complete_signature()`, que mueve el documento firmado de
+`PENDING` a `RECENT` y llama a `DataManager.save_documents()` —
+inmediatamente, no al cerrar la app.
+
+**Cuándo se lee:** al importar `main.py` (es decir, al abrir la app),
+`PENDING, RECENT = DM.load_documents(DEFAULT_PENDING, DEFAULT_RECENT)` —
+si `documentos.json` ya existe, se usa eso; si no (primera vez), se usan
+los datos de ejemplo de `main.py` como semilla.
+
+**Así se prueba la persistencia real** (cerrar y volver a abrir la app):
+1. Inicia sesión y firma un documento pendiente.
+2. Cierra la app (`Alt+F4` o cerrar la ventana) y vuelve a abrirla
+   (`python main.py`).
+3. El documento firmado ya no aparece en "Tareas Pendientes" — aparece en
+   "Liquidaciones Recientes", exactamente donde quedó.
+
+**Manejo de excepciones:** cada lectura y escritura está en su propio
+`try/except` (`FileNotFoundError`, `IOError`/`OSError`,
+`json.JSONDecodeError`) — un error de disco nunca debe tumbar la app ni
+interrumpir el flujo de firma; en el peor caso, se pierde ese guardado
+puntual y la app sigue funcionando con lo que ya tenía en memoria (mismo
+criterio que pide la diapositiva de la Sesión 24, "Check-in 2").
+
+Las contraseñas se guardan **con hash** (SHA-256, `_hash_password()` en
+`data_manager.py`), no en texto plano — es una maqueta sin backend real,
+pero no hay motivo para guardar contraseñas legibles en un archivo JSON.
 
 ## Remote Config
 
@@ -359,12 +424,50 @@ hace falta escribir nada especial.
 - **Nunca** agregues `.venv/`, `__pycache__/` ni archivos `.pyc` al commit
   (`.gitignore` ya los bloquea; si `git status` los muestra igual, es que
   ya estaban trackeados de antes — avisen y se limpia una vez).
-- Si cada uno trabaja en un archivo distinto (por ejemplo, tú en
-  `remote_config.py`/`notifications.py` y tu compañero en el módulo de
-  persistencia JSON/login), los conflictos de Git son improbables. Si
-  ambos editan el mismo archivo el mismo día, hagan `git pull` seguido
-  antes de empezar a editar, para no divergir mucho.
+- Si cada uno trabaja en un archivo distinto, los conflictos de Git son
+  improbables. Si ambos editan el mismo archivo el mismo día, hagan
+  `git pull` seguido antes de empezar a editar, para no divergir mucho.
 - Si `git push` es rechazado (`rejected: non-fast-forward`), es porque el
   otro ya subió algo que tú no tienes — nunca uses `--force`; simplemente
   `git pull origin main` primero (resuelve el merge si pide), y recién
   ahí `git push origin main`.
+
+## 11. Dificultades encontradas y cómo se resolvieron
+
+Dificultades reales del desarrollo, documentadas con honestidad (en detalle,
+con las pruebas que las confirmaron, en [`USO_IA.md`](USO_IA.md)):
+
+- **El efecto "modal flotante" no se veía:** al capturar una foto del
+  Dashboard (`Widget.export_as_image()`) y pintarla con el widget `Image`
+  de Kivy, se veía diminuta y mal ubicada. Se investigó inspeccionando el
+  tamaño real del widget en vivo (`widget.size`) y se encontró que `Image`
+  no recalcula bien su tamaño de render cuando se le asigna una textura
+  sin pasar por su propiedad `source`. Se resolvió dibujando la textura a
+  mano con `kivy.graphics.Rectangle` (`SnapshotBackground` en
+  `widgets.py`), el mismo patrón que ya usaba `MeshBackground`.
+- **El campo de RUT/correo del Login se veía descuadrado:** la causa real
+  no era la alineación del texto, sino que el placeholder y el campo de
+  escritura eran hijos directos de un `MDBoxLayout` (que **reparte** el
+  ancho entre sus hijos) en vez de un `MDFloatLayout` (que los
+  **superpone**) — el campo real solo ocupaba la mitad de la caja.
+- **No se podía escribir un correo en el campo de Login:** el autoformateo
+  de RUT (que agrega puntos y guion mientras se escribe) borraba cada
+  letra de un correo apenas se tecleaba, porque el formateador descarta
+  todo lo que no sea un dígito o "K". Se corrigió para que ese
+  autoformateo solo se aplique si todo lo escrito hasta ese momento
+  **podría** ser un RUT — en cuanto aparece una letra normal, se deja el
+  texto tranquilo. Se detectó simulando tecleo real
+  (`TextInput.insert_text()` carácter por carácter), no asignando el
+  texto completo de una vez como se había probado la primera vez.
+- **GitHub sirve los `.json` como `text/plain`, no `application/json`:**
+  `kivy.network.urlrequest.UrlRequest` solo decodifica la respuesta como
+  JSON si el servidor manda el header correcto; `raw.githubusercontent.com`
+  no lo manda, así que `remote_config.py` recibía texto plano y lo
+  descartaba como inválido. Se agregó un `json.loads()` manual antes de
+  rendirse.
+- **El Gist de GitHub para Remote Config no se pudo crear:** se intentó
+  alojar el JSON remoto en un GitHub Gist (como sugiere el material del
+  curso) y la API lo rechazó por política del entorno de desarrollo
+  usado. Se resolvió sirviendo el JSON desde este mismo repositorio vía
+  `raw.githubusercontent.com` — cumple el mismo patrón cliente/servidor
+  sobre HTTP real.

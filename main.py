@@ -50,6 +50,7 @@ import theme as T
 from widgets import GlassCard, MeshBackground, Pressable, PressCard, SnapshotBackground
 import remote_config
 import notifications
+from data_manager import DataManager
 
 # ---------------------------------------------------------------- OPCIONES
 SHOW_DESKTOP_CTA = False   # Default Local -> True = agrega "¿No iniciaste sesión?"
@@ -68,19 +69,28 @@ REMOTE_CONFIG_URL = ('https://raw.githubusercontent.com/zikness/FirmApp/'
 # ------------------------------------------------------------------- DATOS
 # (Igual que en la diapositiva del taller: esto es la "interconexion" de
 #  datos, no diseno visual — por eso vive en .py y no en .kv)
-PENDING = [
+# DEFAULT_* son la semilla de la PRIMERA vez que se abre la app (no hay
+# datos previos guardados todavia). Una vez que exista data/documentos.json
+# (ver data_manager.py), PENDING/RECENT se cargan de ahi -- asi un
+# documento firmado sigue firmado aunque se cierre y se vuelva a abrir la
+# app (Criterio B de la Sesion 24: "los datos criticos persisten entre
+# ejecuciones").
+DEFAULT_PENDING = [
     dict(doc_type='Contrato', title='Contrato de Trabajo Indefinido',
          deadline='17 Sep 2026', urgent=True, pages=4),
     dict(doc_type='Liquidación', title='Liquidación de Sueldo — Agosto 2026',
          deadline='20 Sep 2026', urgent=False, pages=2),
 ]
 
-RECENT = [
+DEFAULT_RECENT = [
     dict(name='Liquidación Julio 2026',   date='01 Aug 2026', filesize='142 KB', offline=True),
     dict(name='Liquidación Junio 2026',   date='02 Jul 2026', filesize='138 KB', offline=True),
     dict(name='Liquidación Mayo 2026',    date='01 Jun 2026', filesize='145 KB', offline=False),
     dict(name='Contrato Renovación 2026', date='15 Jan 2026', filesize='512 KB', offline=True),
 ]
+
+DM = DataManager()
+PENDING, RECENT = DM.load_documents(DEFAULT_PENDING, DEFAULT_RECENT)
 
 
 # ============================================================= COMPONENTES
@@ -276,8 +286,13 @@ class SignPanel(GlassCard):
 
     # --------------------------------------------------------------- firmar
     def sign(self):
-        """Solo visual: no firma nada real. Navega a la pantalla de exito."""
-        MDApp.get_running_app().go_to_success(self.title)
+        """No valida una firma digital real (no hay certificado ni
+        backend) -- pero SI queda un registro real: el documento pasa de
+        PENDING a RECENT y se guarda en JSON (ver
+        InterfazRRHHApp.complete_signature(), data_manager.py)."""
+        app = MDApp.get_running_app()
+        app.complete_signature(self.doc_type, self.title, self.deadline, self.pages)
+        app.go_to_success(self.title)
 
     # --------------------------------------------------------------- cerrar
     def close(self):
@@ -294,14 +309,16 @@ class SignPanel(GlassCard):
 class LoginScreen(Screen):
     """
     Pantalla 'Iniciar sesion' -- la primera que ve el usuario. Valida el
-    identificador (RUT chileno con digito verificador real, o correo con
-    formato nombre@dominio.com -- ver validators.py) y una contrasena no
-    vacia, y habilita 'Ingresar' solo cuando ambos son validos.
+    formato del identificador (RUT chileno con digito verificador real, o
+    correo con formato nombre@dominio.com -- ver validators.py) y que la
+    contrasena no este vacia, y habilita 'Ingresar' solo cuando ambos
+    tienen formato valido.
 
-    Es una maqueta: no hay backend que autentique nada de verdad (ver el
-    encabezado de main.py). login() es el punto exacto donde conectar una
-    autenticacion real mas adelante -- en vez de navegar directo a Inicio,
-    llamaria a un servicio y reaccionaria a su respuesta.
+    login() SI autentica de verdad contra las cuentas guardadas en
+    usuarios.json (data_manager.py, Criterio B de la Sesion 24: "Login
+    validado... persisten entre ejecuciones"). Si el formato es valido
+    pero la cuenta no existe o la contrasena no coincide, se avisa en
+    'auth_feedback' sin navegar a ningun lado.
     """
     def on_kv_post(self, base_widget):
         self._id_valid = False
@@ -310,10 +327,12 @@ class LoginScreen(Screen):
 
     def set_id_valid(self, valid):
         self._id_valid = bool(valid)
+        self.ids.auth_feedback.text = ''
         self._refresh_cta()
 
     def set_password_filled(self, text):
         self._password_ok = len(text) >= 4
+        self.ids.auth_feedback.text = ''
         self._refresh_cta()
 
     def _refresh_cta(self):
@@ -321,8 +340,79 @@ class LoginScreen(Screen):
         self.ids.cta.set_enabled(ok)
 
     def login(self):
-        """Solo visual: no autentica nada real. Navega a Inicio."""
-        MDApp.get_running_app().go_to_home_after_login()
+        app = MDApp.get_running_app()
+        identifier = self.ids.identifier.text
+        password = self.ids.password.text
+        if app.dm.authenticate(identifier, password):
+            self.ids.auth_feedback.text = ''
+            app.go_to_home_after_login()
+        else:
+            self.ids.auth_feedback.text = (
+                'RUT/correo o contraseña incorrectos. '
+                '¿Todavía no tienes cuenta? Regístrate abajo.')
+
+
+class RegisterScreen(Screen):
+    """
+    Pantalla 'Crear cuenta'. Valida formato (igual que LoginScreen) mas
+    que la confirmacion de contrasena coincida, y registra la cuenta de
+    verdad en usuarios.json (data_manager.py). Si se crea con exito, entra
+    directo a Inicio -- registro + login combinados en un solo paso, como
+    en el "Happy Path" de la demo (Registro e Ingreso -> Creacion de Datos
+    -> ...).
+    """
+    def on_kv_post(self, base_widget):
+        self._id_valid = False
+        self._password_ok = False
+        self._confirm_ok = False
+        self._refresh_cta()
+
+    def set_id_valid(self, valid):
+        self._id_valid = bool(valid)
+        self.ids.feedback.text = ''
+        self._refresh_cta()
+
+    def set_password_filled(self, text):
+        self._password_ok = len(text) >= 4
+        self._check_confirm()
+        self.ids.feedback.text = ''
+        self._refresh_cta()
+
+    def set_confirm_filled(self, text):
+        self._check_confirm()
+        self.ids.feedback.text = ''
+        self._refresh_cta()
+
+    def _check_confirm(self):
+        self._confirm_ok = (self.ids.password.text != '' and
+                            self.ids.password.text == self.ids.confirm.text)
+
+    def _refresh_cta(self):
+        ok = (getattr(self, '_id_valid', False) and
+              getattr(self, '_password_ok', False) and
+              getattr(self, '_confirm_ok', False))
+        self.ids.cta.set_enabled(ok)
+
+    def register(self):
+        app = MDApp.get_running_app()
+        identifier = self.ids.identifier.text
+        password = self.ids.password.text
+        ok, mensaje = app.dm.register_user(identifier, password)
+        self.ids.feedback.text = mensaje
+        self.ids.feedback.text_color = (T.C_PRIMARY if ok else
+                                        T.rgba(T.ORANGE, .95))
+        if ok:
+            app.go_to_home_after_login()
+
+    def reset(self):
+        """Limpia el formulario al entrar (para no dejar datos de una
+        cuenta anterior si el usuario vuelve a abrir esta pantalla)."""
+        self.ids.identifier.text = ''
+        self.ids.password.text = ''
+        self.ids.confirm.text = ''
+        self.ids.feedback.text = ''
+        self._id_valid = self._password_ok = self._confirm_ok = False
+        self._refresh_cta()
 
 
 class HomeScreen(Screen):
@@ -357,14 +447,25 @@ class RootScreen(MeshBackground):
     una configuracion remota valida (ver _apply_remote_config() mas abajo).
     """
     banner_text = StringProperty('')   # vacio = el banner no se muestra
+    pending_count = NumericProperty(0)  # cuantos PENDING hay (badge + stat)
+    max_recent = NumericProperty(0)    # ultimo limite aplicado (local o remoto)
 
     def on_kv_post(self, base_widget):
-        for doc in PENDING:
-            self.ids.pending_box.add_widget(PendingCard(**doc))
+        self.refresh_pending()
         self.set_max_recent(len(RECENT))
         self.set_desktop_cta_visible(SHOW_DESKTOP_CTA)
         if ENTRY_ANIMATION:
             Clock.schedule_once(self._entry_animation, 0)
+
+    def refresh_pending(self):
+        """Repuebla 'Tareas Pendientes' desde PENDING (datos.py / JSON) y
+        mantiene el contador (badge de la seccion + tarjeta 'sin firma')
+        en sincronia -- se llama al abrir la app y despues de firmar un
+        documento (ver InterfazRRHHApp.complete_signature())."""
+        self.ids.pending_box.clear_widgets()
+        for doc in PENDING:
+            self.ids.pending_box.add_widget(PendingCard(**doc))
+        self.pending_count = len(PENDING)
 
     def set_desktop_cta_visible(self, visible):
         """Feature flag remoto: muestra/oculta 'Firmar sin sesión' sin
@@ -375,7 +476,10 @@ class RootScreen(MeshBackground):
 
     def set_max_recent(self, n):
         """Limite numerico remoto: cuantas 'Liquidaciones Recientes' se
-        listan (siempre sobre los mismos datos de RECENT)."""
+        listan (siempre sobre los mismos datos de RECENT). Se guarda en
+        'max_recent' para poder repetir el mismo limite despues de firmar
+        un documento nuevo, sin perder lo que trajo Remote Config."""
+        self.max_recent = n
         docs = RECENT[:max(0, n)]
         self.ids.docs_box.clear_widgets()
         total = len(docs)
@@ -446,19 +550,28 @@ class InterfazRRHHApp(MDApp):
         Window.size = (420, 880)
         Window.clearcolor = T.rgba(T.BG)
 
-        # ScreenManager con las 3 pantallas navegables de la maqueta:
-        # Login -> Inicio (tablero) -> Firmar (RUT / dibujar firma) -> Exito.
-        # Cada pantalla se crea una sola vez y persiste durante toda la
-        # sesion; navegar solo cambia cual esta visible (sm.current), no
-        # crea ni destruye widgets como hacia el modal original. LoginScreen
-        # se agrega primero -> es la que el ScreenManager muestra al abrir.
+        # Persistencia (data_manager.py): una sola instancia de
+        # DataManager para toda la app -- la misma que ya cargo
+        # PENDING/RECENT al importar este modulo. 'self.dm' es el punto
+        # donde el resto del codigo (LoginScreen, RegisterScreen, firmar
+        # un documento) la encuentra.
+        self.dm = DM
+
+        # ScreenManager con las 5 pantallas navegables de la maqueta:
+        # Login -> Registro -> Inicio (tablero) -> Firmar (RUT / dibujar
+        # firma) -> Exito. Cada pantalla se crea una sola vez y persiste
+        # durante toda la sesion; navegar solo cambia cual esta visible
+        # (sm.current), no crea ni destruye widgets como hacia el modal
+        # original. LoginScreen se agrega primero -> es la que el
+        # ScreenManager muestra al abrir.
         self.sm = ScreenManager(transition=FadeTransition(duration=0.16))
         self.login_screen = LoginScreen(name='login')
+        self.register_screen = RegisterScreen(name='register')
         self.home_screen = HomeScreen(name='home')
         self.sign_screen = SignScreen(name='sign')
         self.success_screen = SuccessScreen(name='success')
-        for screen in (self.login_screen, self.home_screen,
-                       self.sign_screen, self.success_screen):
+        for screen in (self.login_screen, self.register_screen,
+                       self.home_screen, self.sign_screen, self.success_screen):
             self.sm.add_widget(screen)
         self.notification_overlay = None
 
@@ -506,8 +619,19 @@ class InterfazRRHHApp(MDApp):
         anim.start(overlay)
 
     # --------------------------------------------------------- navegacion
+    def go_to_register(self):
+        """Login -> Registro."""
+        self.register_screen.reset()
+        self.sm.current = 'register'
+
+    def go_to_login(self):
+        """Registro -> Login (volver sin crear cuenta)."""
+        self.sm.current = 'login'
+
     def go_to_home_after_login(self):
-        """Login -> Inicio. Llamado por LoginScreen.login()."""
+        """Login o Registro -> Inicio. Llamado por LoginScreen.login() y
+        por RegisterScreen.register() cuando la cuenta se crea con exito
+        (registro + login combinados, ver RegisterScreen)."""
         self.sm.current = 'home'
         # Notificaciones (Plyer): si al entrar ya hay un documento urgente,
         # se avisa una vez al sistema operativo -- el mismo lugar donde
@@ -537,9 +661,25 @@ class InterfazRRHHApp(MDApp):
                              '%s se firmó correctamente.' % doc_title)
 
     def go_home(self):
-        """Firmar o Exito -> Inicio. Cierra el flujo de firma sin guardar
-        nada (la maqueta no persiste datos)."""
+        """Firmar o Exito -> Inicio. Cierra el flujo de firma."""
         self.sm.current = 'home'
+
+    def complete_signature(self, doc_type, title, deadline, pages):
+        """Pasa un documento de PENDING a RECENT y lo persiste en JSON
+        (data_manager.py) -- Criterio B de la Sesion 24: el documento
+        firmado sigue firmado aunque se cierre y se vuelva a abrir la app.
+        Llamado por SignPanel.sign() antes de navegar a Exito."""
+        PENDING[:] = [d for d in PENDING if d['title'] != title]
+        RECENT.insert(0, dict(
+            name=title,
+            date=datetime.now().strftime('%d %b %Y'),
+            filesize='—',
+            offline=True,
+        ))
+        self.dm.save_documents(PENDING, RECENT)
+        dashboard = self.home_screen.ids.dashboard
+        dashboard.refresh_pending()
+        dashboard.set_max_recent(dashboard.max_recent)
 
     def _snapshot_home(self):
         """Foto del Dashboard tal como se ve justo antes de ir a Firmar, para
@@ -572,7 +712,7 @@ for _cls in (_w.GlassCard, _w.DashedPanel, _w.PressCard, _w.GradientTile,
              _w.LoginIdentifierInput, _w.PasswordInput,
              StatCard, QuickActionCard, SectionLabel, HeaderCard,
              PendingCard, DocRow, FooterCard, DesktopCtaCard,
-             SignPanel, LoginScreen, HomeScreen, SignScreen, SuccessScreen,
+             SignPanel, LoginScreen, RegisterScreen, HomeScreen, SignScreen, SuccessScreen,
              RootScreen, NotificationOverlay):
     Factory.register(_cls.__name__, cls=_cls)
 

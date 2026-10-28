@@ -19,3 +19,8 @@ Thumbs.db
 
 # Logs de Kivy
 *.kivy_home/
+
+# Persistencia en JSON (data_manager.py): datos generados en tiempo de
+# ejecucion (cuentas registradas, documentos firmados) -- no es codigo
+# fuente y es distinto en cada maquina. Se crea solo al correr la app.
+data/
