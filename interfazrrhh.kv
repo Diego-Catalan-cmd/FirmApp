@@ -9,6 +9,7 @@
 #:import T theme
 #:import dp kivy.metrics.dp
 #:import sp kivy.metrics.sp
+#:import S solicitudes
 
 
 # ============================================================ CLASES DINAMICAS
@@ -258,6 +259,7 @@
                 pos_hint: {'x': 0, 'center_y': .5}
                 on_release: app.show_notifications()
             Dot:
+                opacity: 1 if root.has_alerts else 0
                 color: T.rgba(T.ORANGE_DOT)
                 ring: True
                 size_hint: None, None
@@ -1253,14 +1255,14 @@
                             size: dp(32), dp(32)
                             pos_hint: {'center_x': .5, 'center_y': .5}
                 Txt:
-                    text: '¡Firmado con éxito!'
+                    text: root.heading
                     font_size: sp(16)
                     bold: True
                     text_color: T.C_TEXT
                     halign: 'center'
                     text_size: self.width, None
                 Txt:
-                    text: '%s ha sido firmado y registrado correctamente.' % root.doc_title
+                    text: root.message
                     font_size: sp(10.5)
                     text_color: T.C_SECONDARY
                     halign: 'center'
@@ -1322,31 +1324,61 @@
             text_color: T.C_TEXT
             halign: 'center'
             text_size: self.width, None
-        Txt:
-            text: root.message if root.message else 'No tienes notificaciones nuevas por ahora.'
-            font_size: sp(13)
-            text_color: T.C_TEXT
-            halign: 'center'
-            text_size: self.width, None
         MDBoxLayout:
+            orientation: 'vertical'
             size_hint_y: None
-            height: dp(26) if root.urgent_count else 0
-            opacity: 1 if root.urgent_count else 0
-            spacing: dp(6)
-            padding: 0, dp(4)
-            Icon:
-                name: 'file'
-                color: T.rgba(T.ORANGE)
-                size_hint: None, None
-                size: dp(15), dp(15)
-                pos_hint: {'center_y': .5}
-            TxtFijo:
-                text: '%d documento(s) urgente(s) por firmar' % root.urgent_count
-                font_name: T.FONT
-                font_size: sp(10.5)
+            height: self.minimum_height
+            spacing: dp(8)
+            Txt:
+                text: 'No tienes notificaciones nuevas por ahora.'
+                font_size: sp(13)
+                text_color: T.C_SECONDARY
+                halign: 'center'
+                text_size: self.width, None
+                opacity: 1 if (not root.message and not root.urgent_count and not root.item_count) else 0
+                height: self.texture_size[1] if (not root.message and not root.urgent_count and not root.item_count) else 0
+            Txt:
+                text: root.message
+                font_size: sp(13)
                 bold: True
-                text_color: T.rgba(T.ORANGE)
-                adaptive_width: True
+                text_color: T.C_TEXT
+                halign: 'center'
+                text_size: self.width, None
+                opacity: 1 if root.message else 0
+                height: self.texture_size[1] if root.message else 0
+            MDBoxLayout:
+                size_hint_y: None
+                height: dp(26) if root.urgent_count else 0
+                opacity: 1 if root.urgent_count else 0
+                spacing: dp(6)
+                padding: 0, dp(4)
+                Icon:
+                    name: 'file'
+                    color: T.rgba(T.ORANGE)
+                    size_hint: None, None
+                    size: dp(15), dp(15)
+                    pos_hint: {'center_y': .5}
+                TxtFijo:
+                    text: '%d documento(s) urgente(s) por firmar' % root.urgent_count
+                    font_name: T.FONT
+                    font_size: sp(10.5)
+                    bold: True
+                    text_color: T.rgba(T.ORANGE)
+                    adaptive_width: True
+        MDScrollView:
+            size_hint_y: None
+            height: min(notif_list.height, dp(236)) if root.item_count else 0
+            opacity: 1 if root.item_count else 0
+            bar_width: dp(3)
+            scroll_type: ['bars', 'content']
+            bar_color: T.rgba(T.PRIMARY, .25)
+            bar_inactive_color: 0, 0, 0, 0
+            MDBoxLayout:
+                id: notif_list
+                orientation: 'vertical'
+                size_hint_y: None
+                height: self.minimum_height
+                spacing: dp(8)
         SolidButton:
             text: 'Cerrar'
             md_bg_color: T.C_PRIMARY
@@ -1372,6 +1404,7 @@
             spacing: dp(14)
 
             HeaderCard:
+                has_alerts: bool(root.banner_text) or app.notif_count > 0
 
             # Banner de Remote Config: vacio por defecto (Default Local, ver
             # RootScreen.banner_text en main.py). Si InterfazRRHHApp logra
@@ -1420,6 +1453,7 @@
                     size_hint: None, None
                     size: dp(14), dp(14)
                     pos_hint: {'center_y': .5}
+                    opacity: 1 if root.banner_text else 0
 
             MDGridLayout:
                 cols: 3
@@ -1430,8 +1464,8 @@
                     value: '18'
                     sub: 'Sep 2026'
                 StatCard:
-                    value: '12'
-                    sub: 'días'
+                    value: str(root.vacation_days)
+                    sub: 'días libres'
                 StatCard:
                     value: str(root.pending_count)
                     sub: 'sin firma'
@@ -1450,18 +1484,21 @@
                     sub_text: 'Solicita días libres'
                     c1: T.C_PRIMARY
                     c2: T.C_PRIMARY_DARK
+                    on_release: app.go_to_vacations()
                 QuickActionCard:
                     icon_name: 'permit'
                     label_text: 'Solicitar Permiso'
                     sub_text: 'Permiso administrativo'
                     c1: T.C_PRIMARY_LIGHT
                     c2: T.C_PRIMARY
+                    on_release: app.go_to_permit()
                 QuickActionCard:
                     icon_name: 'camera'
                     label_text: 'Subir Licencia'
                     sub_text: 'Foto o PDF médico'
                     c1: T.C_SECONDARY
                     c2: T.C_PRIMARY_LIGHT
+                    on_release: app.go_to_license()
 
             SectionLabel:
                 title: 'TAREAS PENDIENTES'
@@ -1541,3 +1578,875 @@
         size_hint: 1, None
         height: dp(64)
         pos_hint: {'x': 0, 'y': 0}
+
+
+# ================================================== SOLICITUDES: COMPONENTES
+# Vacaciones, Permiso y Licencia comparten estas piezas (misma paleta, mismas
+# tarjetas "glass"). Las 3 pantallas de abajo solo las ordenan.
+
+<ScreenHeader>:
+    size_hint_y: None
+    height: dp(84)
+    padding: dp(16), dp(24), dp(16), dp(8)
+    spacing: dp(12)
+    IconButton:
+        icon_name: 'back'
+        icon_color: T.C_PRIMARY
+        md_bg_color: T.C_TINT_10
+        radius: dp(13)
+        size_hint: None, None
+        size: dp(40), dp(40)
+        pos_hint: {'center_y': .5}
+        on_release: app.go_home()
+    MDBoxLayout:
+        orientation: 'vertical'
+        spacing: dp(2)
+        MDWidget:
+        Txt:
+            text: root.title
+            font_size: sp(18)
+            bold: True
+            text_color: T.C_TEXT
+        Txt:
+            text: root.subtitle
+            font_size: sp(10.5)
+            text_color: T.C_SECONDARY
+        MDWidget:
+
+
+<Chip>:
+    size_hint: None, None
+    height: dp(32)
+    width: chip_lbl.texture_size[0] + dp(26)
+    padding: dp(13), 0
+    radius: dp(16)
+    md_bg_color: T.C_TINT_10
+    line_color: T.rgba(T.PRIMARY, .35)
+    line_width: 1.2
+    TxtFijo:
+        id: chip_lbl
+        text: root.text
+        font_name: T.FONT
+        font_size: sp(11)
+        bold: True
+        text_color: T.C_PRIMARY_DARK
+        adaptive_width: True
+
+
+# Un dia del calendario: el color depende de 'state' (ver DayCell en widgets.py).
+<DayCell>:
+    radius: dp(12)
+    md_bg_color: T.C_PRIMARY if root.state == 'edge' else (T.C_TINT_20 if root.state == 'range' else (0, 0, 0, 0))
+    line_color: T.C_PRIMARY if root.state == 'today' else (0, 0, 0, 0)
+    line_width: 1.5
+    disabled: root.state in ('empty', 'disabled')
+    TxtFijo:
+        text: root.text
+        font_name: T.FONT
+        font_size: sp(13)
+        bold: root.state in ('edge', 'today')
+        text_color: (1, 1, 1, 1) if root.state == 'edge' else (T.C_PRIMARY_DARK if root.state == 'range' else (T.rgba(T.SECONDARY, .55) if root.state == 'disabled' else T.C_TEXT))
+        disabled_color: self.text_color
+
+
+<CalendarPicker>:
+    orientation: 'vertical'
+    size_hint_y: None
+    height: self.minimum_height
+    spacing: dp(8)
+    MDBoxLayout:
+        size_hint_y: None
+        height: dp(40)
+        spacing: dp(8)
+        IconButton:
+            icon_name: 'back'
+            icon_color: T.C_PRIMARY if root.can_prev else T.rgba(T.SECONDARY, .4)
+            md_bg_color: T.C_TINT_10 if root.can_prev else (0, 0, 0, 0)
+            radius: dp(12)
+            size_hint: None, None
+            size: dp(38), dp(38)
+            pos_hint: {'center_y': .5}
+            on_release: root.prev_month()
+        TxtFijo:
+            text: root.month_label
+            font_name: T.FONT
+            font_size: sp(14.5)
+            bold: True
+            text_color: T.C_TEXT
+        IconButton:
+            icon_name: 'chevron'
+            icon_color: T.C_PRIMARY
+            md_bg_color: T.C_TINT_10
+            radius: dp(12)
+            size_hint: None, None
+            size: dp(38), dp(38)
+            pos_hint: {'center_y': .5}
+            on_release: root.next_month()
+    MDGridLayout:
+        cols: 7
+        size_hint_y: None
+        height: dp(18)
+        TxtFijo:
+            text: 'L'
+            font_name: T.FONT
+            font_size: sp(10)
+            bold: True
+            text_color: T.C_SECONDARY
+        TxtFijo:
+            text: 'M'
+            font_name: T.FONT
+            font_size: sp(10)
+            bold: True
+            text_color: T.C_SECONDARY
+        TxtFijo:
+            text: 'M'
+            font_name: T.FONT
+            font_size: sp(10)
+            bold: True
+            text_color: T.C_SECONDARY
+        TxtFijo:
+            text: 'J'
+            font_name: T.FONT
+            font_size: sp(10)
+            bold: True
+            text_color: T.C_SECONDARY
+        TxtFijo:
+            text: 'V'
+            font_name: T.FONT
+            font_size: sp(10)
+            bold: True
+            text_color: T.C_SECONDARY
+        TxtFijo:
+            text: 'S'
+            font_name: T.FONT
+            font_size: sp(10)
+            bold: True
+            text_color: T.C_SECONDARY
+        TxtFijo:
+            text: 'D'
+            font_name: T.FONT
+            font_size: sp(10)
+            bold: True
+            text_color: T.C_SECONDARY
+    MDGridLayout:
+        id: grid
+        cols: 7
+        rows: 6
+        size_hint_y: None
+        height: dp(6 * 42)
+        spacing: dp(3)
+        # 42 DayCell se agregan desde Python (CalendarPicker.on_kv_post)
+    MDBoxLayout:
+        size_hint_y: None
+        height: dp(40)
+        padding: dp(12), 0
+        spacing: dp(8)
+        radius: dp(12)
+        md_bg_color: T.C_TINT_10 if root.complete else T.rgba(T.MUTED, .9)
+        Icon:
+            name: 'calendar'
+            color: T.C_PRIMARY if root.complete else T.C_SECONDARY
+            size_hint: None, None
+            size: dp(16), dp(16)
+            pos_hint: {'center_y': .5}
+        TxtFijo:
+            text: root.summary
+            font_name: T.FONT
+            font_size: sp(11)
+            bold: root.complete
+            text_color: T.C_PRIMARY_DARK if root.complete else T.C_SECONDARY
+            halign: 'left'
+            text_size: self.size
+
+
+<ReasonCard>:
+    orientation: 'vertical'
+    size_hint_y: None
+    height: self.minimum_height
+    radius: dp(22)
+    padding: dp(16)
+    spacing: dp(10)
+    MDBoxLayout:
+        size_hint_y: None
+        height: dp(18)
+        TxtFijo:
+            text: root.title
+            font_name: T.FONT
+            font_size: sp(11.5)
+            bold: True
+            text_color: T.C_TEXT
+            adaptive_width: True
+        MDWidget:
+        TxtFijo:
+            text: '%d/%d' % (len(root.text), root.max_chars)
+            font_name: T.FONT
+            font_size: sp(9.5)
+            text_color: T.C_SECONDARY
+            adaptive_width: True
+    MDBoxLayout:
+        size_hint_y: None
+        height: dp(118)
+        md_bg_color: 1, 1, 1, .7
+        line_color: T.C_PRIMARY if field.focus else T.C_BG
+        line_width: 1.8
+        radius: dp(14)
+        padding: dp(8), dp(6)
+        ReasonInput:
+            id: field
+            hint_text: root.placeholder
+            hint_text_color: T.rgba(T.SECONDARY, .65)
+            background_normal: ''
+            background_active: ''
+            background_color: 0, 0, 0, 0
+            foreground_color: T.C_TEXT
+            cursor_color: T.C_PRIMARY
+            selection_color: T.rgba(T.PRIMARY, .25)
+            font_name: T.FONT
+            font_size: sp(13.5)
+            padding: dp(8), dp(8)
+            max_chars: root.max_chars
+            on_text: root.text = self.text
+
+
+<OptionRow>:
+    size_hint_y: None
+    height: dp(46)
+    padding: dp(14), 0
+    spacing: dp(8)
+    radius: dp(12)
+    md_bg_color: T.C_TINT_10 if root.selected else (0, 0, 0, 0)
+    TxtFijo:
+        text: root.text
+        font_name: T.FONT
+        font_size: sp(12)
+        bold: root.selected
+        text_color: T.C_PRIMARY_DARK if root.selected else T.C_TEXT
+        halign: 'left'
+        text_size: self.size
+    Icon:
+        name: 'check'
+        color: T.C_PRIMARY
+        opacity: 1 if root.selected else 0
+        size_hint: None, None
+        size: dp(14), dp(14)
+        pos_hint: {'center_y': .5}
+
+
+<DropdownField>:
+    orientation: 'vertical'
+    size_hint_y: None
+    height: self.minimum_height
+    spacing: dp(6)
+    PressableBox:
+        size_hint_y: None
+        height: dp(56)
+        padding: dp(16), 0
+        spacing: dp(8)
+        radius: dp(14)
+        md_bg_color: 1, 1, 1, .7
+        line_color: T.C_PRIMARY if (root.expanded or root.selected) else T.C_BG
+        line_width: 1.8
+        on_release: root.toggle()
+        TxtFijo:
+            text: root.selected if root.selected else root.placeholder
+            font_name: T.FONT
+            font_size: sp(13)
+            bold: bool(root.selected)
+            text_color: T.C_TEXT if root.selected else T.rgba(T.SECONDARY, .85)
+            halign: 'left'
+            text_size: self.size
+        Icon:
+            name: 'down'
+            color: T.C_PRIMARY
+            size_hint: None, None
+            size: dp(18), dp(18)
+            pos_hint: {'center_y': .5}
+    MDBoxLayout:
+        id: options_box
+        orientation: 'vertical'
+        size_hint_y: None
+        height: (self.minimum_height) if root.expanded else 0
+        opacity: 1 if root.expanded else 0
+        disabled: not root.expanded
+        padding: dp(6)
+        spacing: dp(2)
+        radius: dp(14)
+        md_bg_color: 1, 1, 1, .85
+        line_color: T.C_BG
+        line_width: 1.2
+
+
+<SourceTile>:
+    orientation: 'vertical'
+    radius: dp(18)
+    padding: dp(12)
+    spacing: dp(6)
+    md_bg_color: T.C_TINT_10 if root.active else (1, 1, 1, .7)
+    line_color: T.C_PRIMARY if root.active else T.C_BG
+    line_width: 1.8
+    MDFloatLayout:
+        size_hint: None, None
+        size: dp(38), dp(38)
+        GradientTile:
+            pos_hint: {'x': 0, 'y': 0}
+            size_hint: 1, 1
+            tile_radius: dp(13)
+            c1: T.C_PRIMARY
+            c2: T.C_PRIMARY_DARK
+        Icon:
+            name: root.icon_name
+            color: 1, 1, 1, 1
+            size_hint: None, None
+            size: dp(20), dp(20)
+            pos_hint: {'center_x': .5, 'center_y': .5}
+    Txt:
+        text: root.title
+        font_size: sp(12)
+        bold: True
+        text_color: T.C_TEXT
+    Txt:
+        text: root.subtitle
+        font_size: sp(9.5)
+        text_color: T.C_SECONDARY
+    MDWidget:
+
+
+<RequestRow>:
+    orientation: 'vertical'
+    size_hint_y: None
+    height: dp(64)
+    MDBoxLayout:
+        spacing: dp(10)
+        padding: 0, dp(8)
+        IconTile:
+            size_hint: None, None
+            size: dp(38), dp(38)
+            pos_hint: {'center_y': .5}
+            icon_name: root.icon_name
+            icon_color: T.C_PRIMARY
+            md_bg_color: T.C_BG
+            radius: dp(13)
+        MDBoxLayout:
+            orientation: 'vertical'
+            spacing: dp(2)
+            MDWidget:
+            Txt:
+                text: root.title
+                font_size: sp(12)
+                bold: True
+                text_color: T.C_TEXT
+                shorten: True
+                shorten_from: 'right'
+                height: dp(16)
+            Txt:
+                text: root.detail
+                font_size: sp(10)
+                text_color: T.C_SECONDARY
+                shorten: True
+                shorten_from: 'right'
+                height: dp(14)
+            MDWidget:
+        Pill:
+            text: 'Aprobada' if root.status == 'aprobada' else 'Pendiente'
+            fg_color: T.rgba(T.EMERALD) if root.status == 'aprobada' else T.rgba(T.ORANGE)
+            md_bg_color: T.rgba(T.EMERALD_BG) if root.status == 'aprobada' else T.rgba(T.ORANGE_BG)
+            pos_hint: {'center_y': .5}
+    Divider:
+        size_hint_y: None
+        height: dp(1)
+        opacity: 0 if root.last else 1
+
+
+<NotificationRow>:
+    size_hint_y: None
+    height: dp(60)
+    padding: dp(10), 0
+    spacing: dp(10)
+    radius: dp(14)
+    md_bg_color: T.C_TINT_10
+    line_color: T.rgba(T.PRIMARY, .3)
+    line_width: 1.2
+    on_release: app.open_notification(root.notif_id)
+    MDFloatLayout:
+        size_hint: None, None
+        size: dp(36), dp(36)
+        pos_hint: {'center_y': .5}
+        GradientTile:
+            pos_hint: {'x': 0, 'y': 0}
+            size_hint: 1, 1
+            tile_radius: dp(12)
+            c1: T.C_PRIMARY
+            c2: T.C_PRIMARY_DARK
+        Icon:
+            name: root.icon_name
+            color: 1, 1, 1, 1
+            size_hint: None, None
+            size: dp(18), dp(18)
+            pos_hint: {'center_x': .5, 'center_y': .5}
+    Txt:
+        text: root.text
+        font_size: sp(11.5)
+        bold: True
+        text_color: T.C_PRIMARY_DARK
+        pos_hint: {'center_y': .5}
+    Icon:
+        name: 'chevron'
+        color: T.C_PRIMARY
+        size_hint: None, None
+        size: dp(14), dp(14)
+        pos_hint: {'center_y': .5}
+
+
+# Aviso emergente que aparece arriba de cualquier pantalla cuando RR.HH.
+# responde una solicitud; al tocarlo abre la seccion y se quita.
+<NotificationToast>:
+    orientation: 'horizontal'
+    size_hint: None, None
+    size: dp(392), dp(66)
+    pos_hint: {'center_x': .5, 'top': .985}
+    opacity: 0
+    disabled: True
+    radius: dp(20)
+    padding: dp(12), 0
+    spacing: dp(12)
+    md_bg_color: 1, 1, 1, .98
+    line_color: T.rgba(T.ORANGE, .55)
+    line_width: 1.5
+    shadow_strength: 2.6
+    on_release: app.open_notification(root.notif_id)
+    MDFloatLayout:
+        size_hint: None, None
+        size: dp(40), dp(40)
+        pos_hint: {'center_y': .5}
+        GradientTile:
+            pos_hint: {'x': 0, 'y': 0}
+            size_hint: 1, 1
+            tile_radius: dp(13)
+            c1: T.rgba(T.ORANGE)
+            c2: T.rgba(T.ORANGE_DOT)
+        Icon:
+            name: root.icon_name
+            color: 1, 1, 1, 1
+            size_hint: None, None
+            size: dp(20), dp(20)
+            pos_hint: {'center_x': .5, 'center_y': .5}
+    MDBoxLayout:
+        orientation: 'vertical'
+        spacing: dp(2)
+        MDWidget:
+        Txt:
+            text: 'RR.HH. RESPONDIÓ · TOCA PARA ABRIR'
+            font_size: sp(8.5)
+            bold: True
+            text_color: T.rgba(T.ORANGE)
+        Txt:
+            text: root.text
+            font_size: sp(12)
+            bold: True
+            text_color: T.C_PRIMARY_DARK
+        MDWidget:
+    Icon:
+        name: 'chevron'
+        color: T.rgba(T.ORANGE)
+        size_hint: None, None
+        size: dp(14), dp(14)
+        pos_hint: {'center_y': .5}
+
+
+<FilePickerPopup>:
+    size_hint: .94, .78
+    background: ''
+    background_color: 0, 0, 0, 0
+    overlay_color: T.rgba(T.TEXT, .45)
+    GlassCard:
+        orientation: 'vertical'
+        radius: dp(22)
+        md_bg_color: T.C_GLASS_MODAL
+        padding: dp(14)
+        spacing: dp(10)
+        Txt:
+            text: 'Elige el archivo de tu licencia'
+            font_size: sp(14)
+            bold: True
+            text_color: T.C_TEXT
+        MDBoxLayout:
+            # El selector de Kivy trae texto blanco: va sobre un fondo oscuro
+            # de la paleta para que se lea.
+            md_bg_color: T.C_PRIMARY_DARK
+            radius: dp(14)
+            padding: dp(6)
+            FileChooserListView:
+                id: chooser
+                on_submit: root.choose()
+        MDBoxLayout:
+            size_hint_y: None
+            height: dp(46)
+            spacing: dp(10)
+            SolidButton:
+                text: 'Cancelar'
+                md_bg_color: T.C_TINT_10
+                fg_color: T.C_PRIMARY
+                radius: dp(15)
+                on_release: root.dismiss()
+            SolidButton:
+                text: 'Elegir'
+                md_bg_color: T.C_PRIMARY
+                fg_color: 1, 1, 1, 1
+                radius: dp(15)
+                on_release: root.choose()
+
+
+# ============================================================ PANTALLAS
+# Cada una: cabecera (volver) + contenido con scroll + boton fijo abajo.
+<VacationScreen>:
+    MeshBackground:
+        MDBoxLayout:
+            orientation: 'vertical'
+            ScreenHeader:
+                title: 'Pedir Vacaciones'
+                subtitle: 'Elige el período de tu descanso'
+            MDScrollView:
+                bar_width: dp(3)
+                scroll_type: ['bars', 'content']
+                bar_color: T.rgba(T.PRIMARY, .25)
+                bar_inactive_color: 0, 0, 0, 0
+                MDBoxLayout:
+                    orientation: 'vertical'
+                    size_hint_y: None
+                    height: self.minimum_height
+                    padding: dp(16), dp(6), dp(16), dp(18)
+                    spacing: dp(14)
+                    GlassCard:
+                        size_hint_y: None
+                        height: dp(60)
+                        radius: dp(18)
+                        padding: dp(14), 0
+                        spacing: dp(12)
+                        IconTile:
+                            size_hint: None, None
+                            size: dp(36), dp(36)
+                            pos_hint: {'center_y': .5}
+                            icon_name: 'vacation'
+                            icon_color: T.C_PRIMARY
+                            md_bg_color: T.C_TINT_10
+                            radius: dp(12)
+                        MDBoxLayout:
+                            orientation: 'vertical'
+                            MDWidget:
+                            Txt:
+                                text: 'Días disponibles'
+                                font_size: sp(10)
+                                text_color: T.C_SECONDARY
+                            Txt:
+                                text: S.plural_days(int(root.available))
+                                font_size: sp(15)
+                                bold: True
+                                text_color: T.C_PRIMARY
+                            MDWidget:
+                    SectionLabel:
+                        title: 'ELIGE LAS FECHAS'
+                    GlassCard:
+                        orientation: 'vertical'
+                        size_hint_y: None
+                        height: self.minimum_height
+                        radius: dp(22)
+                        padding: dp(14)
+                        CalendarPicker:
+                            id: calendar
+                            on_range_change: root.refresh()
+                    Txt:
+                        text: root.error
+                        font_size: sp(10)
+                        bold: True
+                        text_color: T.rgba(T.ORANGE, .95)
+                        opacity: 1 if root.error else 0
+                        height: self.texture_size[1] if root.error else 0
+                    ReasonCard:
+                        id: reason
+                        title: 'Motivo de tus vacaciones'
+                        placeholder: 'Cuéntanos brevemente por qué pides estos días…'
+                        on_text: root.refresh()
+                    SectionLabel:
+                        title: 'TUS SOLICITUDES'
+                    GlassCard:
+                        orientation: 'vertical'
+                        size_hint_y: None
+                        height: self.minimum_height
+                        radius: dp(22)
+                        padding: dp(16), dp(8)
+                        Txt:
+                            text: 'Aún no has enviado solicitudes de vacaciones.'
+                            font_size: sp(10.5)
+                            text_color: T.C_SECONDARY
+                            padding: 0, dp(8)
+                            opacity: 0 if root.has_requests else 1
+                            height: 0 if root.has_requests else self.texture_size[1] + dp(16)
+                        MDBoxLayout:
+                            id: requests_box
+                            orientation: 'vertical'
+                            size_hint_y: None
+                            height: self.minimum_height
+            MDBoxLayout:
+                size_hint_y: None
+                height: dp(78)
+                padding: dp(16), dp(12)
+                md_bg_color: 1, 1, 1, .72
+                SolidButton:
+                    id: cta
+                    text: 'Enviar solicitud'
+                    icon_name: 'chevron'
+                    md_bg_color: T.C_PRIMARY
+                    fg_color: 1, 1, 1, 1
+                    height: dp(52)
+                    radius: dp(17)
+                    on_release: root.send()
+
+
+<PermitScreen>:
+    MeshBackground:
+        MDBoxLayout:
+            orientation: 'vertical'
+            ScreenHeader:
+                title: 'Solicitar Permiso'
+                subtitle: 'Un día libre por fuerza mayor'
+            MDScrollView:
+                bar_width: dp(3)
+                scroll_type: ['bars', 'content']
+                bar_color: T.rgba(T.PRIMARY, .25)
+                bar_inactive_color: 0, 0, 0, 0
+                MDBoxLayout:
+                    orientation: 'vertical'
+                    size_hint_y: None
+                    height: self.minimum_height
+                    padding: dp(16), dp(6), dp(16), dp(18)
+                    spacing: dp(14)
+                    MDBoxLayout:
+                        size_hint_y: None
+                        height: self.minimum_height
+                        padding: dp(14), dp(12)
+                        spacing: dp(10)
+                        radius: dp(16)
+                        md_bg_color: T.rgba(T.ORANGE_BG)
+                        line_color: T.rgba(T.ORANGE, .45)
+                        line_width: 1.2
+                        Icon:
+                            name: 'permit'
+                            color: T.rgba(T.ORANGE)
+                            size_hint: None, None
+                            size: dp(20), dp(20)
+                            pos_hint: {'top': 1}
+                        Txt:
+                            text: 'Solo para emergencias o fuerza mayor (salud, familia, siniestros). Son de 1 a 3 días; para un descanso planificado usa Pedir Vacaciones.'
+                            font_size: sp(10.5)
+                            text_color: T.C_PRIMARY_DARK
+                    SectionLabel:
+                        title: 'ELIGE EL DÍA (MÁXIMO 3)'
+                    GlassCard:
+                        orientation: 'vertical'
+                        size_hint_y: None
+                        height: self.minimum_height
+                        radius: dp(22)
+                        padding: dp(14)
+                        CalendarPicker:
+                            id: calendar
+                            on_range_change: root.refresh()
+                    Txt:
+                        text: root.error
+                        font_size: sp(10)
+                        bold: True
+                        text_color: T.rgba(T.ORANGE, .95)
+                        opacity: 1 if root.error else 0
+                        height: self.texture_size[1] if root.error else 0
+                    SectionLabel:
+                        title: 'MOTIVOS FRECUENTES'
+                    MDBoxLayout:
+                        size_hint_y: None
+                        height: dp(32)
+                        spacing: dp(8)
+                        Chip:
+                            text: 'Emergencia familiar'
+                            on_release: root.use_reason('Emergencia familiar')
+                        Chip:
+                            text: 'Salud'
+                            on_release: root.use_reason('Problema de salud')
+                        Chip:
+                            text: 'Siniestro'
+                            on_release: root.use_reason('Siniestro en mi domicilio')
+                        MDWidget:
+                    ReasonCard:
+                        id: reason
+                        title: 'Motivo de fuerza mayor'
+                        placeholder: 'Explica qué ocurrió y por qué necesitas ausentarte…'
+                        on_text: root.refresh()
+                    SectionLabel:
+                        title: 'TUS SOLICITUDES'
+                    GlassCard:
+                        orientation: 'vertical'
+                        size_hint_y: None
+                        height: self.minimum_height
+                        radius: dp(22)
+                        padding: dp(16), dp(8)
+                        Txt:
+                            text: 'Aún no has enviado solicitudes de permiso.'
+                            font_size: sp(10.5)
+                            text_color: T.C_SECONDARY
+                            opacity: 0 if root.has_requests else 1
+                            height: 0 if root.has_requests else self.texture_size[1] + dp(16)
+                        MDBoxLayout:
+                            id: requests_box
+                            orientation: 'vertical'
+                            size_hint_y: None
+                            height: self.minimum_height
+            MDBoxLayout:
+                size_hint_y: None
+                height: dp(78)
+                padding: dp(16), dp(12)
+                md_bg_color: 1, 1, 1, .72
+                SolidButton:
+                    id: cta
+                    text: 'Enviar solicitud'
+                    icon_name: 'chevron'
+                    md_bg_color: T.C_PRIMARY
+                    fg_color: 1, 1, 1, 1
+                    height: dp(52)
+                    radius: dp(17)
+                    on_release: root.send()
+
+
+<LicenseScreen>:
+    MeshBackground:
+        MDBoxLayout:
+            orientation: 'vertical'
+            ScreenHeader:
+                title: 'Subir Licencia'
+                subtitle: 'Adjunta tu licencia médica'
+            MDScrollView:
+                bar_width: dp(3)
+                scroll_type: ['bars', 'content']
+                bar_color: T.rgba(T.PRIMARY, .25)
+                bar_inactive_color: 0, 0, 0, 0
+                MDBoxLayout:
+                    orientation: 'vertical'
+                    size_hint_y: None
+                    height: self.minimum_height
+                    padding: dp(16), dp(6), dp(16), dp(18)
+                    spacing: dp(14)
+                    SectionLabel:
+                        title: 'TIPO DE LICENCIA'
+                    DropdownField:
+                        id: type_select
+                        placeholder: 'Selecciona el tipo de licencia'
+                        options: S.LICENSE_TYPES
+                        on_select: root.refresh()
+                    SectionLabel:
+                        title: 'ADJUNTA TU LICENCIA'
+                    MDBoxLayout:
+                        size_hint_y: None
+                        height: dp(116)
+                        spacing: dp(12)
+                        SourceTile:
+                            icon_name: 'upload'
+                            title: 'Subir archivo'
+                            subtitle: 'PDF, PNG o JPG'
+                            active: root.source == 'file'
+                            on_release: root.pick_file()
+                        SourceTile:
+                            icon_name: 'camera'
+                            title: 'Tomar foto'
+                            subtitle: 'Con la cámara'
+                            active: root.source == 'camera'
+                            on_release: root.take_photo()
+                    Txt:
+                        text: root.notice
+                        font_size: sp(10)
+                        bold: True
+                        text_color: T.rgba(T.ORANGE, .95)
+                        opacity: 1 if root.notice else 0
+                        height: self.texture_size[1] if root.notice else 0
+                    GlassCard:
+                        size_hint_y: None
+                        height: dp(76) if root.file_name else 0
+                        opacity: 1 if root.file_name else 0
+                        disabled: not root.file_name
+                        radius: dp(18)
+                        padding: dp(12), dp(10)
+                        spacing: dp(12)
+                        line_color: (T.rgba(T.EMERALD, .6) if root.file_ok else T.rgba(T.ORANGE, .7)) if root.file_name else T.C_GLASS_BORDER
+                        line_width: 1.4
+                        MDFloatLayout:
+                            size_hint: None, None
+                            size: dp(54), dp(54)
+                            pos_hint: {'center_y': .5}
+                            IconTile:
+                                pos_hint: {'x': 0, 'y': 0}
+                                size_hint: 1, 1
+                                icon_name: 'file'
+                                icon_color: T.C_PRIMARY
+                                md_bg_color: T.C_BG
+                                radius: dp(14)
+                            Image:
+                                source: root.file_path if root.file_is_image else ''
+                                fit_mode: 'cover'
+                                pos_hint: {'x': 0, 'y': 0}
+                                size_hint: 1, 1
+                                opacity: 1 if root.file_is_image else 0
+                        MDBoxLayout:
+                            orientation: 'vertical'
+                            spacing: dp(3)
+                            MDWidget:
+                            Txt:
+                                text: root.file_name
+                                font_size: sp(12)
+                                bold: True
+                                text_color: T.C_TEXT
+                                shorten: True
+                                shorten_from: 'right'
+                                height: dp(16)
+                            Txt:
+                                text: root.file_msg
+                                font_size: sp(9.5)
+                                bold: True
+                                text_color: T.rgba(T.EMERALD) if root.file_ok else T.rgba(T.ORANGE)
+                            MDWidget:
+                        IconButton:
+                            icon_name: 'close'
+                            icon_color: T.C_SECONDARY
+                            md_bg_color: T.C_TINT_10
+                            radius: dp(12)
+                            size_hint: None, None
+                            size: dp(34), dp(34)
+                            pos_hint: {'center_y': .5}
+                            on_release: root.remove_file()
+                    SectionLabel:
+                        title: 'TUS SOLICITUDES'
+                    GlassCard:
+                        orientation: 'vertical'
+                        size_hint_y: None
+                        height: self.minimum_height
+                        radius: dp(22)
+                        padding: dp(16), dp(8)
+                        Txt:
+                            text: 'Aún no has subido licencias.'
+                            font_size: sp(10.5)
+                            text_color: T.C_SECONDARY
+                            opacity: 0 if root.has_requests else 1
+                            height: 0 if root.has_requests else self.texture_size[1] + dp(16)
+                        MDBoxLayout:
+                            id: requests_box
+                            orientation: 'vertical'
+                            size_hint_y: None
+                            height: self.minimum_height
+            MDBoxLayout:
+                size_hint_y: None
+                height: dp(78)
+                padding: dp(16), dp(12)
+                md_bg_color: 1, 1, 1, .72
+                SolidButton:
+                    id: cta
+                    text: 'Enviar licencia'
+                    icon_name: 'chevron'
+                    md_bg_color: T.C_PRIMARY
+                    fg_color: 1, 1, 1, 1
+                    height: dp(52)
+                    radius: dp(17)
+                    on_release: root.send()

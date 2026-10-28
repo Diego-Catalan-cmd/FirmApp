@@ -358,3 +358,31 @@ tocar nada; el estudiante aprobó los cambios (sí/no) uno a uno:
   `123456785`) creaba cuentas distintas; ahora la clave se normaliza.
 - El aviso grande de notificaciones ahora sigue al banner si este cambia
   con el aviso abierto; se corrigió un comentario desactualizado.
+
+### Solicitudes de RR.HH.: Vacaciones, Permiso y Licencia
+
+Pedido del estudiante: implementar las 3 acciones rápidas (cada una en su
+propia pantalla, con calendario, texto de motivo, menú desplegable, subir
+archivo o tomar foto) y que cada una genere una notificación ("Sus
+vacaciones fueron aprobadas") que, al tocarla, abra su sección y se quite.
+
+- Decisiones que tomó la IA al no haber indicaciones en contra (el
+  estudiante puede cambiarlas): un calendario propio (`CalendarPicker`) en
+  vez del `MDDatePicker` de KivyMD, para respetar la paleta; un menú
+  desplegable en línea en vez de `MDDropdownMenu`; y la **aprobación
+  simulada** de RR.HH. (no hay backend), que dispara la notificación a los
+  10 s.
+- **Límite que la IA dejó explícito:** "se valida que sea una licencia" solo
+  puede comprobarse como *documento utilizable* (formato, contenido real,
+  peso, legibilidad); verificar que sea auténtica requeriría OCR o un
+  backend. Está documentado en `README.md` y en `solicitudes.py`.
+- Bugs encontrados al probar: un id de kv llamado `items` chocaba con el
+  método `dict.items` de `ids`; el selector de archivos de Kivy trae texto
+  blanco y era ilegible sobre fondo claro (se le dio fondo de la paleta); y
+  los chips no centraban su texto porque `pos_hint` se ignora en un
+  `BoxLayout`. También se ocultó un chevron del banner que quedaba visible
+  con el banner vacío.
+- Probado en modo headless: flujos completos de las 3 solicitudes, límites
+  del calendario, validación de archivos buenos y malos, aprobación,
+  notificación, apertura y eliminación, y persistencia tras cerrar y
+  reabrir (las respuestas pendientes se retoman).

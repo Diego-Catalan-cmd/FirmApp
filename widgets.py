@@ -17,6 +17,9 @@ sus propiedades nativas `md_bg_color`, `radius`, `line_color` y
 visual vive en interfazrrhh.kv — igual que <FormularioAS@MDBoxLayout>
 del ejemplo de la diapositiva.
 """
+import calendar
+from datetime import date, timedelta
+
 from kivy.animation import Animation
 from kivy.core.window import Window
 from kivy.graphics import (Color, RoundedRectangle, Rectangle, Line, Ellipse,
@@ -24,9 +27,10 @@ from kivy.graphics import (Color, RoundedRectangle, Rectangle, Line, Ellipse,
 from kivy.graphics.texture import Texture
 from kivy.metrics import dp
 from kivy.properties import (ListProperty, NumericProperty, StringProperty,
-                             BooleanProperty)
+                             BooleanProperty, ObjectProperty)
 from kivy.uix.behaviors import ButtonBehavior
 from kivy.uix.stencilview import StencilView
+from kivy.uix.textinput import TextInput
 
 # ── Componentes de KivyMD (Material Design) ─────────────────────────────────
 from kivymd.uix.boxlayout import MDBoxLayout
@@ -38,6 +42,7 @@ from kivymd.uix.widget import MDWidget
 import theme as T
 from icons import ICONS, STROKE
 from validators import identify
+from solicitudes import MESES_LARGO, fmt_range, plural_days, count_days
 
 
 # ============================================================== TEXTURAS
@@ -721,3 +726,262 @@ class SignaturePad(StencilView):
             self._line = None
             return True
         return super().on_touch_up(touch)
+
+
+# ===================================================== PANTALLAS DE SOLICITUD
+# Widgets reutilizados por Vacaciones, Permiso y Licencia. Como siempre, el
+# diseno (hijos, colores) vive en interfazrrhh.kv; aqui solo propiedades y
+# la logica de cada componente.
+class ScreenHeader(MDBoxLayout):
+    """Cabecera de las pantallas de solicitud: boton volver + titulo."""
+    title = StringProperty('')
+    subtitle = StringProperty('')
+
+
+class Chip(PressableBox):
+    """Boton-etiqueta redondeado (motivos sugeridos del permiso)."""
+    text = StringProperty('')
+
+
+class DayCell(Pressable, MDBoxLayout):
+    """
+    Una celda (dia) del calendario. 'state' decide como se pinta (ver la
+    regla <DayCell> en el .kv): empty | disabled | normal | today | range |
+    edge (primer o ultimo dia elegido).
+    """
+    text = StringProperty('')
+    state = StringProperty('empty')
+    day = ObjectProperty(None, allownone=True)
+    picker = ObjectProperty(None, allownone=True)
+
+    def on_release(self):
+        super().on_release()
+        if self.day is not None and self.picker is not None:
+            self.picker.pick(self.day)
+
+
+class CalendarPicker(MDBoxLayout):
+    """
+    Calendario mensual para elegir un RANGO de dias (inicio y termino).
+
+    Reglas (las usan Vacaciones y Permiso con la misma clase):
+      - los dias pasados quedan deshabilitados;
+      - 1er toque = primer dia; 2do toque = ultimo dia (tocar de nuevo el
+        mismo dia = solo ese dia); un 3er toque empieza una seleccion nueva;
+      - 'max_days' (0 = sin tope) deshabilita los dias que superarian el
+        maximo permitido una vez elegido el primero (Permiso: 3 dias;
+        Vacaciones: el saldo disponible).
+    Avisa con el evento on_range_change cada vez que cambia la seleccion.
+    """
+    __events__ = ('on_range_change',)
+
+    start = ObjectProperty(None, allownone=True)
+    end = ObjectProperty(None, allownone=True)
+    max_days = NumericProperty(0)
+    year = NumericProperty(0)
+    month = NumericProperty(0)
+    month_label = StringProperty('')
+    summary = StringProperty('')
+    complete = BooleanProperty(False)
+    can_prev = BooleanProperty(False)
+
+    def on_kv_post(self, base_widget):
+        self._today = date.today()
+        self.year, self.month = self._today.year, self._today.month
+        self._cells = []
+        for _ in range(42):
+            cell = DayCell(picker=self)
+            self.ids.grid.add_widget(cell)
+            self._cells.append(cell)
+        self.bind(max_days=lambda *a: self.refresh())
+        self.refresh()
+
+    # ----------------------------------------------------------- seleccion
+    def pick(self, d):
+        if d < self._today:
+            return
+        if self.start is None or self.end is not None:
+            self.start, self.end = d, None
+        elif d < self.start:
+            self.start = d
+        else:
+            if self.max_days and count_days(self.start, d) > self.max_days:
+                return
+            self.end = d
+        self.refresh()
+        self.dispatch('on_range_change')
+
+    def clear(self):
+        self.start = self.end = None
+        self.year, self.month = self._today.year, self._today.month
+        self.refresh()
+        self.dispatch('on_range_change')
+
+    def on_range_change(self, *args):
+        pass
+
+    # -------------------------------------------------------- meses / dibujo
+    def prev_month(self):
+        if not self.can_prev:
+            return
+        self.month -= 1
+        if self.month < 1:
+            self.month, self.year = 12, self.year - 1
+        self.refresh()
+
+    def next_month(self):
+        self.month += 1
+        if self.month > 12:
+            self.month, self.year = 1, self.year + 1
+        self.refresh()
+
+    def _state_for(self, d):
+        if d < self._today:
+            return 'disabled'
+        if d == self.start or d == self.end:
+            return 'edge'
+        if self.start and self.end and self.start < d < self.end:
+            return 'range'
+        if (self.start and not self.end and self.max_days and d > self.start
+                and count_days(self.start, d) > self.max_days):
+            return 'disabled'
+        return 'today' if d == self._today else 'normal'
+
+    def refresh(self):
+        self.month_label = '%s %d' % (MESES_LARGO[self.month - 1], self.year)
+        self.can_prev = (self.year, self.month) > (self._today.year, self._today.month)
+        offset = date(self.year, self.month, 1).weekday()      # lunes = 0
+        ndays = calendar.monthrange(self.year, self.month)[1]
+        for i, cell in enumerate(self._cells):
+            n = i - offset + 1
+            if 1 <= n <= ndays:
+                d = date(self.year, self.month, n)
+                cell.day, cell.text, cell.state = d, str(n), self._state_for(d)
+            else:
+                cell.day, cell.text, cell.state = None, '', 'empty'
+        self.complete = bool(self.start and self.end)
+        if self.complete:
+            self.summary = '%s · %s' % (fmt_range(self.start, self.end),
+                                        plural_days(count_days(self.start, self.end)))
+        elif self.start:
+            self.summary = 'Ahora toca el último día (o el mismo si es uno solo)'
+        else:
+            self.summary = 'Toca el primer día'
+
+
+class ReasonInput(TextInput):
+    """Cuadro de texto multilinea con tope de caracteres (motivo)."""
+    max_chars = NumericProperty(300)
+
+    def insert_text(self, substring, from_undo=False):
+        room = self.max_chars - len(self.text)
+        if room <= 0:
+            return
+        return super().insert_text(substring[:room], from_undo=from_undo)
+
+
+class ReasonCard(GlassCard):
+    """Tarjeta 'Motivo': titulo, cuadro de texto y contador. 'text' refleja
+    lo escrito para que la pantalla reaccione con on_text."""
+    title = StringProperty('Motivo')
+    placeholder = StringProperty('')
+    text = StringProperty('')
+    max_chars = NumericProperty(300)
+
+    def clear(self):
+        self.ids.field.text = ''
+
+    def set_text(self, value):
+        self.ids.field.text = value[:self.max_chars]
+        self.ids.field.cursor = self.ids.field.get_cursor_from_index(len(self.ids.field.text))
+
+
+class OptionRow(PressableBox):
+    """Una opcion del menu desplegable."""
+    text = StringProperty('')
+    selected = BooleanProperty(False)
+    owner = ObjectProperty(None, allownone=True)
+
+    def on_release(self):
+        super().on_release()
+        if self.owner is not None:
+            self.owner.choose(self.text)
+
+
+class DropdownField(MDBoxLayout):
+    """
+    Menu desplegable en linea: un campo que al tocarlo abre la lista de
+    opciones justo debajo (sin ventana flotante, para que respete la paleta
+    y funcione igual dentro de un ScrollView). 'selected' guarda la opcion
+    elegida y on_select avisa cuando cambia.
+    """
+    __events__ = ('on_select',)
+
+    options = ListProperty([])
+    placeholder = StringProperty('Selecciona una opción')
+    selected = StringProperty('')
+    expanded = BooleanProperty(False)
+
+    def on_kv_post(self, base_widget):
+        self._build_options()
+
+    def on_options(self, *args):
+        if 'options_box' in self.ids:
+            self._build_options()
+
+    def _build_options(self):
+        box = self.ids.options_box
+        box.clear_widgets()
+        for opt in self.options:
+            box.add_widget(OptionRow(text=opt, owner=self,
+                                     selected=(opt == self.selected)))
+
+    def toggle(self):
+        self.expanded = not self.expanded
+
+    def choose(self, text):
+        self.selected = text
+        self.expanded = False
+        for row in self.ids.options_box.children:
+            row.selected = (row.text == text)
+        self.dispatch('on_select', text)
+
+    def reset(self):
+        self.selected = ''
+        self.expanded = False
+        for row in self.ids.options_box.children:
+            row.selected = False
+
+    def on_select(self, *args):
+        pass
+
+
+class SourceTile(PressableBox):
+    """Opcion grande 'Subir archivo' / 'Tomar foto'."""
+    icon_name = StringProperty('upload')
+    title = StringProperty('')
+    subtitle = StringProperty('')
+    active = BooleanProperty(False)
+
+
+class RequestRow(MDBoxLayout):
+    """Fila de 'Tus solicitudes': que se pidio y en que estado esta."""
+    icon_name = StringProperty('file')
+    title = StringProperty('')
+    detail = StringProperty('')
+    status = StringProperty('pendiente')      # pendiente | aprobada
+    last = BooleanProperty(False)
+
+
+class NotificationRow(PressableBox):
+    """Fila tocable de una notificacion (aviso grande y aviso emergente)."""
+    notif_id = StringProperty('')
+    icon_name = StringProperty('bell')
+    text = StringProperty('')
+
+
+class NotificationToast(PressCard):
+    """Aviso emergente arriba de la pantalla cuando RR.HH. responde."""
+    notif_id = StringProperty('')
+    icon_name = StringProperty('check')
+    text = StringProperty('')

@@ -32,6 +32,7 @@ _HERE = os.path.dirname(os.path.abspath(__file__))
 DATA_DIR = os.path.join(_HERE, 'data')
 USERS_FILE = os.path.join(DATA_DIR, 'usuarios.json')
 DOCS_FILE = os.path.join(DATA_DIR, 'documentos.json')
+REQUESTS_FILE = os.path.join(DATA_DIR, 'solicitudes.json')
 
 
 def _hash_password(password):
@@ -146,4 +147,29 @@ class DataManager:
             return True
         except (IOError, OSError) as exc:
             print('DataManager: no se pudo guardar documentos.json (%s)' % exc)
+            return False
+
+    # ============================================================ SOLICITUDES
+    def load_requests(self):
+        """Devuelve (solicitudes, notificaciones) guardadas en
+        solicitudes.json: las peticiones de vacaciones/permiso/licencia y las
+        notificaciones aun no leidas. ([], []) si no existe o esta corrupto."""
+        try:
+            with open(REQUESTS_FILE, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+            return list(data.get('requests', [])), list(data.get('notifications', []))
+        except FileNotFoundError:
+            return [], []
+        except (IOError, OSError, json.JSONDecodeError, AttributeError) as exc:
+            print('DataManager: no se pudo leer solicitudes.json (%s)' % exc)
+            return [], []
+
+    def save_requests(self, requests, notifications):
+        try:
+            with open(REQUESTS_FILE, 'w', encoding='utf-8') as f:
+                json.dump({'requests': requests, 'notifications': notifications},
+                          f, indent=2, ensure_ascii=False)
+            return True
+        except (IOError, OSError) as exc:
+            print('DataManager: no se pudo guardar solicitudes.json (%s)' % exc)
             return False

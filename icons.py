@@ -87,6 +87,32 @@ ICONS = {
         ('pl', [(14, 11), (14, 17)]),
         ('pl', [(9, 6), (9, 4), (15, 4), (15, 6)]),
     ],
+    # Flecha izquierda (volver)
+    'back': [
+        ('pl', [(15, 18), (9, 12), (15, 6)]),
+    ],
+    # Flecha abajo (desplegable)
+    'down': [
+        ('pl', [(6, 9), (12, 15), (18, 9)]),
+    ],
+    # Calendario
+    'calendar': [
+        ('r', 3, 5, 18, 16, 3),
+        ('pl', [(3, 10), (21, 10)]),
+        ('pl', [(8, 3), (8, 7)]),
+        ('pl', [(16, 3), (16, 7)]),
+    ],
+    # Subir archivo
+    'upload': [
+        ('pl', [(12, 16), (12, 4)]),
+        ('pl', [(7, 9), (12, 4), (17, 9)]),
+        ('pl', [(4, 16), (4, 20), (20, 20), (20, 16)]),
+    ],
+    # Reloj (solicitud pendiente)
+    'clock': [
+        ('c', 12, 12, 9),
+        ('pl', [(12, 7), (12, 12), (16, 14)]),
+    ],
     # Wifi
     'wifi': [
         ('pl', arc_points(12, 20, 12.6, 197, 343, 20)),
@@ -100,5 +126,6 @@ ICONS = {
 STROKE = {
     'vacation': 1.8, 'permit': 1.8, 'camera': 1.8, 'pen': 1.8, 'check': 2.5,
     'pin': 1.8, 'chevron': 2.0, 'bell': 1.8, 'file': 1.8, 'close': 2.0,
-    'trash': 1.8, 'wifi': 1.8,
+    'trash': 1.8, 'wifi': 1.8, 'back': 2.2, 'down': 2.2, 'calendar': 1.8,
+    'upload': 1.8, 'clock': 1.8,
 }

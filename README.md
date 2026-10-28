@@ -65,12 +65,14 @@ abajo.
 ```
 FirmApp/
 ├── main.py                    <- SOLO clases y lógica (hereda de MDApp)
-│                                  ScreenManager + 5 pantallas: Login, Registro,
-│                                  Inicio, Firmar, Éxito
+│                                  ScreenManager + 8 pantallas: Login, Registro,
+│                                  Inicio, Firmar, Éxito, Vacaciones, Permiso,
+│                                  Licencia
 ├── interfazrrhh.kv            <- TODO el diseño visual (componentes KivyMD)
 ├── widgets.py                 <- Clases base sobre MDBoxLayout / MDCard / MDTextField
 ├── validators.py              <- Validación de RUT (dígito verificador) y correo
-├── data_manager.py            <- Persistencia en JSON: usuarios y documentos
+├── data_manager.py            <- Persistencia en JSON: usuarios, documentos y solicitudes
+├── solicitudes.py             <- Reglas de Vacaciones / Permiso / Licencia (sin Kivy)
 ├── icons.py                   <- Los iconos SVG del diseño, redibujados para Kivy
 ├── theme.py                   <- Colores y tipografías
 ├── remote_config.py           <- Remote Config: fetch + fallback (UrlRequest)
@@ -79,7 +81,9 @@ FirmApp/
 │   └── config.json             <- JSON remoto real, servido desde GitHub (raw)
 ├── data/                       <- (se crea sola al ejecutar; no se versiona)
 │   ├── usuarios.json            <- Cuentas registradas (contraseña con hash)
-│   └── documentos.json          <- Qué está PENDING / qué pasó a RECENT
+│   ├── documentos.json          <- Qué está PENDING / qué pasó a RECENT
+│   ├── solicitudes.json         <- Solicitudes y notificaciones sin leer
+│   └── licencias/               <- Archivos de licencia subidos
 ├── requirements.txt
 ├── FUNDAMENTACION-UX-UI.md    <- Investigación de usuarios y matriz hallazgo → decisión
 ├── USO_IA.md                  <- Declaración de uso de IA (este proyecto)
@@ -91,7 +95,7 @@ FirmApp/
 ## Navegación (ScreenManager)
 
 La maqueta original no tenía `ScreenManager`: era una sola pantalla con un
-modal superpuesto. Se reestructuró a 5 pantallas navegables, tal como exige
+modal superpuesto. Se reestructuró a 8 pantallas navegables, tal como exige
 la evaluación:
 
 0. **`login`** (`LoginScreen`) — primera pantalla: RUT o correo + contraseña,
@@ -101,13 +105,18 @@ la evaluación:
    rápidas, tareas pendientes y liquidaciones recientes.
 3. **`sign`** (`SignScreen`) — tarjeta de firma con dos pestañas (RUT /
    Dibujar) para el documento elegido en Inicio.
-4. **`success`** (`SuccessScreen`) — confirmación de firma, con botón para
-   volver a Inicio.
+4. **`success`** (`SuccessScreen`) — confirmación de firma o de solicitud
+   enviada, con botón para volver a Inicio.
+5. **`vacation`** (`VacationScreen`), 6. **`permit`** (`PermitScreen`) y
+   7. **`license`** (`LicenseScreen`) — las 3 solicitudes de RR.HH. (ver
+   "Solicitudes de RR.HH." más abajo), a las que se llega desde las tarjetas
+   de Acciones Rápidas o desde una notificación.
 
-`InterfazRRHHApp.build()` crea las 5 pantallas una sola vez dentro de un
+`InterfazRRHHApp.build()` crea las 8 pantallas una sola vez dentro de un
 `ScreenManager` (arranca en `login`) y la navegación
 (`go_to_register`, `go_to_login`, `go_to_home_after_login`, `go_to_sign`,
-`go_to_success`, `go_home`) solo cambia `sm.current` — no crea ni destruye
+`go_to_success`, `go_to_vacations`, `go_to_permit`, `go_to_license`,
+`go_home`) solo cambia `sm.current` — no crea ni destruye
 widgets en cada viaje.
 
 ## Autenticación: Login y Registro
@@ -187,6 +196,52 @@ criterio que pide la diapositiva de la Sesión 24, "Check-in 2").
 Las contraseñas se guardan **con hash** (SHA-256, `_hash_password()` en
 `data_manager.py`), no en texto plano — es una maqueta sin backend real,
 pero no hay motivo para guardar contraseñas legibles en un archivo JSON.
+
+## Solicitudes de RR.HH. (Vacaciones, Permiso y Licencia)
+
+Las 3 tarjetas de **Acciones Rápidas** del Inicio abren una pantalla propia,
+con el mismo diseño (tarjetas "glass", misma paleta) y un botón fijo abajo:
+
+| Pantalla | Qué hace | Reglas (`solicitudes.py`) |
+|---|---|---|
+| **Pedir Vacaciones** (`VacationScreen`) | Calendario (`CalendarPicker`) para elegir inicio y término + motivo | Desde hoy, dentro del saldo de días libres (12), motivo ≥ 10 caracteres — `validate_vacation()` |
+| **Solicitar Permiso** (`PermitScreen`) | Igual, para fuerza mayor; motivos frecuentes tocables (`Chip`) | De **1 a 3 días** (no son vacaciones): el calendario deshabilita los días que pasarían el máximo — `validate_permit()` |
+| **Subir Licencia** (`LicenseScreen`) | Menú desplegable con el tipo de licencia (`DropdownField`) + dos opciones: **subir archivo** o **tomar foto** | `validate_license_file()` |
+
+- **Calendario:** 1er toque = primer día, 2do toque = último día (tocar de
+  nuevo el mismo día = solo ese día). Los días pasados quedan deshabilitados.
+  Es el mismo componente para Vacaciones y Permiso; cambia solo `max_days`.
+- **Saldo de vacaciones:** el "12 días libres" del Inicio es real: baja al
+  enviar una solicitud (`InterfazRRHHApp.vacation_available()`).
+- **Subir archivo / Tomar foto:** usa `plyer.filechooser` (selector del
+  sistema) y `plyer.camera`. Si el equipo no tiene cámara (por ejemplo un
+  computador), avisa y deja elegir una foto guardada; si tampoco hay selector
+  del sistema, usa `FilePickerPopup` (selector propio de la app).
+- **Validación de la licencia — alcance real:** la app comprueba que sea un
+  documento utilizable: formato permitido (PDF/PNG/JPG), que el contenido real
+  coincida con la extensión (no un `.exe` renombrado), peso entre 10 KB y
+  10 MB, PDF completo y, si es imagen, resolución mínima para leerse. **No
+  puede verificar que el documento sea auténtico ni leer su contenido** (eso
+  requiere OCR o un backend; lo revisaría RR.HH./COMPIN).
+- **Persistencia:** cada solicitud se guarda en `data/solicitudes.json` y el
+  archivo de la licencia se copia a `data/licencias/`.
+
+### Notificaciones de las solicitudes
+
+Como no hay backend, la respuesta de RR.HH. es **simulada**: `REVIEW_DELAY`
+(10 s, en `main.py`) después de enviar, la solicitud pasa a *aprobada*
+(`InterfazRRHHApp._approve()`) y se genera la notificación
+("Sus vacaciones fueron aprobadas (…)", "Su permiso fue aprobado…", "Su
+licencia fue validada y aprobada"). Aparece de 4 formas:
+1. **Aviso emergente** arriba de cualquier pantalla (`NotificationToast`).
+2. **Punto naranja** en la campana del Inicio (`notif_count`).
+3. **Lista en el aviso grande** de la campana (`NotificationRow`).
+4. **Notificación del sistema** (Plyer).
+
+Al **tocar** el aviso emergente o la fila de la lista se abre la sección
+correspondiente y la notificación **se elimina**
+(`InterfazRRHHApp.open_notification()`). Las respuestas pendientes
+sobreviven a cerrar la app: al volver a iniciar sesión se retoman.
 
 ## Remote Config
 
