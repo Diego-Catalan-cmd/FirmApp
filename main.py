@@ -31,6 +31,7 @@ Config.set('graphics', 'width', '420')
 Config.set('graphics', 'height', '880')
 Config.set('input', 'mouse', 'mouse,multitouch_on_demand')
 
+import os
 from datetime import datetime
 
 from kivy.animation import Animation
@@ -82,6 +83,15 @@ ENTRY_ANIMATION = True     # animación de entrada al abrir la app
 REMOTE_CONFIG_URL = ('https://raw.githubusercontent.com/zikness/FirmApp/'
                       'main/remote/config.json')
 REMOTE_CONFIG_POLL_INTERVAL = 5  # segundos entre cada re-consulta
+
+# Interruptor de la demo en vivo: True = lee remote/config.json del disco
+# (editas, guardas, y en <=5 s cambia la app, sin push ni CDN); False =
+# lee la URL de GitHub de arriba (fuente remota real, requiere push).
+REMOTE_CONFIG_USE_LOCAL = True
+REMOTE_CONFIG_LOCAL_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                        'remote', 'config.json')
+if REMOTE_CONFIG_USE_LOCAL:
+    REMOTE_CONFIG_URL = REMOTE_CONFIG_LOCAL_PATH
 
 # ------------------------------------------------------------------- DATOS
 # (Igual que en la diapositiva del taller: esto es la "interconexion" de

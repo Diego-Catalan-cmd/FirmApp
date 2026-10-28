@@ -234,19 +234,13 @@ Hay dos formas de cambiar el valor remoto:
   unos minutos en servir el commit nuevo — nada práctico para la
   "modificación en vivo" de la defensa.
 - **Editando el archivo local directamente, sin ningún `git push`**
-  (recomendado para la demo): `remote_config.fetch()` acepta tanto una
-  URL `http(s)://` (la usa con `UrlRequest`, asíncrono) como una ruta de
-  archivo local (la lee directo del disco). Para esto, en `main.py` se
-  cambia la constante `REMOTE_CONFIG_URL` para que apunte al archivo
-  local en vez de a GitHub:
-  ```python
-  REMOTE_CONFIG_URL = os.path.join(os.path.dirname(__file__),
-                                    'remote', 'config.json')
-  ```
-  Con la app corriendo, basta editar y guardar ese `remote/config.json`
-  con cualquier editor de texto — en el siguiente ciclo de polling (máx.
-  5 segundos después) el banner/CTA/límite cambian solos en la pantalla,
-  sin recompilar ni reiniciar nada.
+  (modo por defecto): `main.py` tiene el interruptor
+  `REMOTE_CONFIG_USE_LOCAL = True`, con el que `remote_config.fetch()` lee
+  `remote/config.json` del disco en vez de pedirlo a GitHub. Con la app
+  corriendo, edita y guarda ese archivo: en el siguiente ciclo de polling
+  (máx. 5 segundos) el banner/CTA/límite cambian solos, sin reiniciar.
+  Poniendo `REMOTE_CONFIG_USE_LOCAL = False` la app vuelve a leer la URL
+  de GitHub (`REMOTE_CONFIG_URL`), que sí requiere `git push`.
 
 ## Notificaciones (Plyer)
 
