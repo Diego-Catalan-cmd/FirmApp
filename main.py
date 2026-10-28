@@ -845,7 +845,8 @@ class RootScreen(MeshBackground):
             self.ids.docs_box.add_widget(DocRow(last=(i == total - 1), **doc))
 
     def _entry_animation(self, dt):
-        widgets = list(self.ids.col.children)[::-1]
+        widgets = (list(self.ids.left_col.children)[::-1] +
+                   list(self.ids.right_col.children)[::-1])
         for i, w in enumerate(widgets):
             w.opacity = 0
             Clock.schedule_once(

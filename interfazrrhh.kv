@@ -352,6 +352,14 @@
     spacing: dp(10)
     radius: dp(12)
     md_bg_color: 0, 0, 0, 0
+    # Separador inferior: se dibuja en el canvas (como hijo de un BoxLayout
+    # horizontal ocupaba una columna al lado derecho en vez de una linea).
+    canvas.after:
+        Color:
+            rgba: (0, 0, 0, 0) if root.last else T.C_DIVIDER
+        Rectangle:
+            pos: self.x + dp(6), self.y
+            size: self.width - dp(12), dp(1)
     IconTile:
         size_hint: None, None
         size: dp(34), dp(34)
@@ -395,12 +403,6 @@
             size_hint: None, None
             size: dp(15), dp(15)
             pos_hint: {'center_y': .5}
-    Divider:
-        pos_hint: {'x': 0, 'y': 0}
-        size_hint: 1, None
-        height: dp(1)
-        opacity: 0 if root.last else 1
-        color: T.C_DIVIDER
 
 
 # =============================================================== BARRA INFERIOR
@@ -1400,178 +1402,198 @@
             orientation: 'vertical'
             size_hint_y: None
             height: self.minimum_height
-            padding: dp(16), dp(28), dp(16), dp(104)
+            padding: max(dp(16), (root.width - dp(1100)) / 2), dp(28), max(dp(16), (root.width - dp(1100)) / 2), dp(104)
             spacing: dp(14)
 
-            HeaderCard:
-                has_alerts: bool(root.banner_text) or app.notif_count > 0
-
-            # Banner de Remote Config: vacio por defecto (Default Local, ver
-            # RootScreen.banner_text en main.py). Si InterfazRRHHApp logra
-            # traer el JSON remoto, 'banner_message' llena este texto y la
-            # fila aparece sola -- sin que nadie la programe a mano, porque
-            # 'height'/'opacity' ya dependen de 'root.banner_text' aqui.
-            PressableBox:
-                id: remote_banner
-                size_hint_y: None
-                height: dp(46) if root.banner_text else 0
-                opacity: 1 if root.banner_text else 0
-                padding: dp(14), 0
-                spacing: dp(10)
-                radius: dp(14)
-                md_bg_color: T.rgba(T.ORANGE_BG)
-                line_color: T.rgba(T.ORANGE, .5)
-                line_width: 1.3
-                disabled: not root.banner_text
-                on_release: app.show_notifications()
-                MDFloatLayout:
-                    size_hint: None, None
-                    size: dp(26), dp(26)
-                    GradientTile:
-                        size_hint: 1, 1
-                        tile_radius: dp(9)
-                        c1: T.rgba(T.ORANGE)
-                        c2: T.rgba(T.ORANGE_DOT)
-                        Icon:
-                            name: 'bell'
-                            color: 1, 1, 1, 1
-                            size_hint: None, None
-                            size: dp(14), dp(14)
-                            pos_hint: {'center_x': .5, 'center_y': .5}
-                TxtFijo:
-                    text: root.banner_text
-                    font_name: T.FONT
-                    font_size: sp(11.5)
-                    bold: True
-                    text_color: T.rgba(T.PRIMARY_DARK)
-                    halign: 'left'
-                    text_size: self.width, None
-                    size_hint_x: 1
-                Icon:
-                    name: 'chevron'
-                    color: T.rgba(T.ORANGE)
-                    size_hint: None, None
-                    size: dp(14), dp(14)
-                    pos_hint: {'center_y': .5}
-                    opacity: 1 if root.banner_text else 0
-
-            MDGridLayout:
-                cols: 3
-                spacing: dp(10)
-                size_hint_y: None
-                height: dp(64)
-                StatCard:
-                    value: '18'
-                    sub: 'Sep 2026'
-                StatCard:
-                    value: str(root.vacation_days)
-                    sub: 'días libres'
-                StatCard:
-                    value: str(root.pending_count)
-                    sub: 'sin firma'
-
-            SectionLabel:
-                title: 'ACCIONES RÁPIDAS'
-
-            MDGridLayout:
-                cols: 3
-                spacing: dp(10)
-                size_hint_y: None
-                height: dp(148)
-                QuickActionCard:
-                    icon_name: 'vacation'
-                    label_text: 'Pedir Vacaciones'
-                    sub_text: 'Solicita días libres'
-                    c1: T.C_PRIMARY
-                    c2: T.C_PRIMARY_DARK
-                    on_release: app.go_to_vacations()
-                QuickActionCard:
-                    icon_name: 'permit'
-                    label_text: 'Solicitar Permiso'
-                    sub_text: 'Permiso administrativo'
-                    c1: T.C_PRIMARY_LIGHT
-                    c2: T.C_PRIMARY
-                    on_release: app.go_to_permit()
-                QuickActionCard:
-                    icon_name: 'camera'
-                    label_text: 'Subir Licencia'
-                    sub_text: 'Foto o PDF médico'
-                    c1: T.C_SECONDARY
-                    c2: T.C_PRIMARY_LIGHT
-                    on_release: app.go_to_license()
-
-            SectionLabel:
-                title: 'TAREAS PENDIENTES'
-                count: root.pending_count
-
             MDBoxLayout:
-                id: pending_box
-                orientation: 'vertical'
+                id: columns
+                orientation: 'horizontal' if root.width >= dp(720) else 'vertical'
                 size_hint_y: None
-                height: self.minimum_height
-                spacing: dp(14)
-                # PendingCard x2 se agregan desde Python (son datos, no diseno)
-
-            SectionLabel:
-                title: 'LIQUIDACIONES RECIENTES'
-
-            GlassCard:
-                id: docs_card
-                orientation: 'vertical'
-                size_hint_y: None
-                height: self.minimum_height
-                radius: dp(22)
-                padding: dp(16), dp(6)
+                height: max(left_col.height, right_col.height) if root.width >= dp(720) else left_col.height + right_col.height + dp(14)
+                spacing: dp(20) if root.width >= dp(720) else dp(14)
                 MDBoxLayout:
-                    size_hint_y: None
-                    height: dp(38)
-                    spacing: dp(6)
-                    MDBoxLayout:
-                        spacing: dp(5)
-                        Icon:
-                            name: 'check'
-                            color: T.rgba(T.EMERALD)
-                            size_hint: None, None
-                            size: dp(13), dp(13)
-                            pos_hint: {'center_y': .5}
-                        Txt:
-                            text: 'Disponibles sin conexión'
-                            font_size: sp(9.5)
-                            text_color: T.rgba(T.EMERALD)
-                            size_hint_x: None
-                            width: dp(140)
-                        MDWidget:
-                    MDBoxLayout:
-                        spacing: dp(5)
-                        MDWidget:
-                        Icon:
-                            name: 'pin'
-                            color: T.C_SECONDARY
-                            size_hint: None, None
-                            size: dp(13), dp(13)
-                            pos_hint: {'center_y': .5}
-                        Txt:
-                            text: 'Fijados al dispositivo'
-                            font_size: sp(9.5)
-                            text_color: T.C_SECONDARY
-                            size_hint_x: None
-                            width: dp(112)
-                Divider:
-                    size_hint_y: None
-                    height: dp(1)
-                MDBoxLayout:
-                    id: docs_box
+                    id: left_col
                     orientation: 'vertical'
                     size_hint_y: None
                     height: self.minimum_height
-                    # DocRow x4 se agregan desde Python (son datos, no diseno)
+                    pos_hint: {'top': 1}
+                    spacing: dp(14)
+                    HeaderCard:
+                        has_alerts: bool(root.banner_text) or app.notif_count > 0
 
-            MDBoxLayout:
-                id: extra_box
-                orientation: 'vertical'
-                size_hint_y: None
-                height: self.minimum_height
-                # DesktopCtaCard opcional (SHOW_DESKTOP_CTA), agregado desde Python
+                    # Banner de Remote Config: vacio por defecto (Default Local, ver
+                    # RootScreen.banner_text en main.py). Si InterfazRRHHApp logra
+                    # traer el JSON remoto, 'banner_message' llena este texto y la
+                    # fila aparece sola -- sin que nadie la programe a mano, porque
+                    # 'height'/'opacity' ya dependen de 'root.banner_text' aqui.
+                    PressableBox:
+                        id: remote_banner
+                        size_hint_y: None
+                        height: dp(46) if root.banner_text else 0
+                        opacity: 1 if root.banner_text else 0
+                        padding: dp(14), 0
+                        spacing: dp(10)
+                        radius: dp(14)
+                        md_bg_color: T.rgba(T.ORANGE_BG)
+                        line_color: T.rgba(T.ORANGE, .5)
+                        line_width: 1.3
+                        disabled: not root.banner_text
+                        on_release: app.show_notifications()
+                        MDFloatLayout:
+                            size_hint: None, None
+                            size: dp(26), dp(26)
+                            GradientTile:
+                                size_hint: 1, 1
+                                opacity: 1 if root.banner_text else 0
+                                tile_radius: dp(9)
+                                c1: T.rgba(T.ORANGE)
+                                c2: T.rgba(T.ORANGE_DOT)
+                                Icon:
+                                    name: 'bell'
+                                    color: 1, 1, 1, 1
+                                    size_hint: None, None
+                                    size: dp(14), dp(14)
+                                    pos_hint: {'center_x': .5, 'center_y': .5}
+                        TxtFijo:
+                            text: root.banner_text
+                            font_name: T.FONT
+                            font_size: sp(11.5)
+                            bold: True
+                            text_color: T.rgba(T.PRIMARY_DARK)
+                            halign: 'left'
+                            text_size: self.width, None
+                            size_hint_x: 1
+                        Icon:
+                            name: 'chevron'
+                            color: T.rgba(T.ORANGE)
+                            size_hint: None, None
+                            size: dp(14), dp(14)
+                            pos_hint: {'center_y': .5}
+                            opacity: 1 if root.banner_text else 0
+
+                    MDGridLayout:
+                        cols: 3
+                        spacing: dp(10)
+                        size_hint_y: None
+                        height: dp(64)
+                        StatCard:
+                            value: '18'
+                            sub: 'Sep 2026'
+                        StatCard:
+                            value: str(root.vacation_days)
+                            sub: 'días libres'
+                        StatCard:
+                            value: str(root.pending_count)
+                            sub: 'sin firma'
+
+                    SectionLabel:
+                        title: 'ACCIONES RÁPIDAS'
+
+                    MDGridLayout:
+                        cols: 3
+                        spacing: dp(10)
+                        size_hint_y: None
+                        height: dp(148)
+                        QuickActionCard:
+                            icon_name: 'vacation'
+                            label_text: 'Pedir Vacaciones'
+                            sub_text: 'Solicita días libres'
+                            c1: T.C_PRIMARY
+                            c2: T.C_PRIMARY_DARK
+                            on_release: app.go_to_vacations()
+                        QuickActionCard:
+                            icon_name: 'permit'
+                            label_text: 'Solicitar Permiso'
+                            sub_text: 'Permiso administrativo'
+                            c1: T.C_PRIMARY_LIGHT
+                            c2: T.C_PRIMARY
+                            on_release: app.go_to_permit()
+                        QuickActionCard:
+                            icon_name: 'camera'
+                            label_text: 'Subir Licencia'
+                            sub_text: 'Foto o PDF médico'
+                            c1: T.C_SECONDARY
+                            c2: T.C_PRIMARY_LIGHT
+                            on_release: app.go_to_license()
+                MDBoxLayout:
+                    id: right_col
+                    orientation: 'vertical'
+                    size_hint_y: None
+                    height: self.minimum_height
+                    pos_hint: {'top': 1}
+                    spacing: dp(14)
+                    SectionLabel:
+                        title: 'TAREAS PENDIENTES'
+                        count: root.pending_count
+
+                    MDBoxLayout:
+                        id: pending_box
+                        orientation: 'vertical'
+                        size_hint_y: None
+                        height: self.minimum_height
+                        spacing: dp(14)
+                        # PendingCard x2 se agregan desde Python (son datos, no diseno)
+
+                    SectionLabel:
+                        title: 'LIQUIDACIONES RECIENTES'
+
+                    GlassCard:
+                        id: docs_card
+                        orientation: 'vertical'
+                        size_hint_y: None
+                        height: self.minimum_height
+                        radius: dp(22)
+                        padding: dp(16), dp(6)
+                        MDBoxLayout:
+                            size_hint_y: None
+                            height: dp(38)
+                            spacing: dp(6)
+                            MDBoxLayout:
+                                spacing: dp(5)
+                                Icon:
+                                    name: 'check'
+                                    color: T.rgba(T.EMERALD)
+                                    size_hint: None, None
+                                    size: dp(13), dp(13)
+                                    pos_hint: {'center_y': .5}
+                                Txt:
+                                    text: 'Disponibles sin conexión'
+                                    font_size: sp(9.5)
+                                    text_color: T.rgba(T.EMERALD)
+                                    size_hint_x: None
+                                    width: dp(140)
+                                MDWidget:
+                            MDBoxLayout:
+                                spacing: dp(5)
+                                MDWidget:
+                                Icon:
+                                    name: 'pin'
+                                    color: T.C_SECONDARY
+                                    size_hint: None, None
+                                    size: dp(13), dp(13)
+                                    pos_hint: {'center_y': .5}
+                                Txt:
+                                    text: 'Fijados al dispositivo'
+                                    font_size: sp(9.5)
+                                    text_color: T.C_SECONDARY
+                                    size_hint_x: None
+                                    width: dp(112)
+                        Divider:
+                            size_hint_y: None
+                            height: dp(1)
+                        MDBoxLayout:
+                            id: docs_box
+                            orientation: 'vertical'
+                            size_hint_y: None
+                            height: self.minimum_height
+                            # DocRow x4 se agregan desde Python (son datos, no diseno)
+
+                    MDBoxLayout:
+                        id: extra_box
+                        orientation: 'vertical'
+                        size_hint_y: None
+                        height: self.minimum_height
+                        # DesktopCtaCard opcional (SHOW_DESKTOP_CTA), agregado desde Python
 
             PressableBox:
                 size_hint_y: None
@@ -1598,9 +1620,10 @@
 
     FooterCard:
         id: footer
-        size_hint: 1, None
+        size_hint: None, None
+        width: min(root.width, dp(1100))
         height: dp(64)
-        pos_hint: {'x': 0, 'y': 0}
+        pos_hint: {'center_x': .5, 'y': 0}
 
 
 # ================================================== SOLICITUDES: COMPONENTES
@@ -2148,82 +2171,102 @@
                     orientation: 'vertical'
                     size_hint_y: None
                     height: self.minimum_height
-                    padding: dp(16), dp(6), dp(16), dp(18)
+                    padding: max(dp(16), (root.width - dp(1000)) / 2), dp(6), max(dp(16), (root.width - dp(1000)) / 2), dp(18)
                     spacing: dp(14)
-                    GlassCard:
+                    MDBoxLayout:
+                        id: columns
+                        orientation: 'horizontal' if root.width >= dp(720) else 'vertical'
                         size_hint_y: None
-                        height: dp(60)
-                        radius: dp(18)
-                        padding: dp(14), 0
-                        spacing: dp(12)
-                        IconTile:
-                            size_hint: None, None
-                            size: dp(36), dp(36)
-                            pos_hint: {'center_y': .5}
-                            icon_name: 'vacation'
-                            icon_color: T.C_PRIMARY
-                            md_bg_color: T.C_TINT_10
-                            radius: dp(12)
+                        height: max(left_col.height, right_col.height) if root.width >= dp(720) else left_col.height + right_col.height + dp(14)
+                        spacing: dp(20) if root.width >= dp(720) else dp(14)
                         MDBoxLayout:
-                            orientation: 'vertical'
-                            MDWidget:
-                            Txt:
-                                text: 'Días disponibles'
-                                font_size: sp(10)
-                                text_color: T.C_SECONDARY
-                            Txt:
-                                text: S.plural_days(int(root.available))
-                                font_size: sp(15)
-                                bold: True
-                                text_color: T.C_PRIMARY
-                            MDWidget:
-                    SectionLabel:
-                        title: 'ELIGE LAS FECHAS'
-                    GlassCard:
-                        orientation: 'vertical'
-                        size_hint_y: None
-                        height: self.minimum_height
-                        radius: dp(22)
-                        padding: dp(14)
-                        CalendarPicker:
-                            id: calendar
-                            on_range_change: root.refresh()
-                    Txt:
-                        text: root.error
-                        font_size: sp(10)
-                        bold: True
-                        text_color: T.rgba(T.ORANGE, .95)
-                        opacity: 1 if root.error else 0
-                        height: self.texture_size[1] if root.error else 0
-                    ReasonCard:
-                        id: reason
-                        title: 'Motivo de tus vacaciones'
-                        placeholder: 'Cuéntanos brevemente por qué pides estos días…'
-                        on_text: root.refresh()
-                    SectionLabel:
-                        title: 'TUS SOLICITUDES'
-                    GlassCard:
-                        orientation: 'vertical'
-                        size_hint_y: None
-                        height: self.minimum_height
-                        radius: dp(22)
-                        padding: dp(16), dp(8)
-                        Txt:
-                            text: 'Aún no has enviado solicitudes de vacaciones.'
-                            font_size: sp(10.5)
-                            text_color: T.C_SECONDARY
-                            padding: 0, dp(8)
-                            opacity: 0 if root.has_requests else 1
-                            height: 0 if root.has_requests else self.texture_size[1] + dp(16)
-                        MDBoxLayout:
-                            id: requests_box
+                            id: left_col
                             orientation: 'vertical'
                             size_hint_y: None
                             height: self.minimum_height
+                            pos_hint: {'top': 1}
+                            spacing: dp(14)
+                            GlassCard:
+                                size_hint_y: None
+                                height: dp(60)
+                                radius: dp(18)
+                                padding: dp(14), 0
+                                spacing: dp(12)
+                                IconTile:
+                                    size_hint: None, None
+                                    size: dp(36), dp(36)
+                                    pos_hint: {'center_y': .5}
+                                    icon_name: 'vacation'
+                                    icon_color: T.C_PRIMARY
+                                    md_bg_color: T.C_TINT_10
+                                    radius: dp(12)
+                                MDBoxLayout:
+                                    orientation: 'vertical'
+                                    MDWidget:
+                                    Txt:
+                                        text: 'Días disponibles'
+                                        font_size: sp(10)
+                                        text_color: T.C_SECONDARY
+                                    Txt:
+                                        text: S.plural_days(int(root.available))
+                                        font_size: sp(15)
+                                        bold: True
+                                        text_color: T.C_PRIMARY
+                                    MDWidget:
+                            SectionLabel:
+                                title: 'ELIGE LAS FECHAS'
+                            GlassCard:
+                                orientation: 'vertical'
+                                size_hint_y: None
+                                height: self.minimum_height
+                                radius: dp(22)
+                                padding: dp(14)
+                                CalendarPicker:
+                                    id: calendar
+                                    on_range_change: root.refresh()
+                            Txt:
+                                text: root.error
+                                font_size: sp(10)
+                                bold: True
+                                text_color: T.rgba(T.ORANGE, .95)
+                                opacity: 1 if root.error else 0
+                                height: self.texture_size[1] if root.error else 0
+                        MDBoxLayout:
+                            id: right_col
+                            orientation: 'vertical'
+                            size_hint_y: None
+                            height: self.minimum_height
+                            pos_hint: {'top': 1}
+                            spacing: dp(14)
+                            ReasonCard:
+                                id: reason
+                                title: 'Motivo de tus vacaciones'
+                                placeholder: 'Cuéntanos brevemente por qué pides estos días…'
+                                on_text: root.refresh()
+                            SectionLabel:
+                                title: 'TUS SOLICITUDES'
+                            GlassCard:
+                                orientation: 'vertical'
+                                size_hint_y: None
+                                height: self.minimum_height
+                                radius: dp(22)
+                                padding: dp(16), dp(8)
+                                Txt:
+                                    text: 'Aún no has enviado solicitudes de vacaciones.'
+                                    font_size: sp(10.5)
+                                    text_color: T.C_SECONDARY
+                                    padding: 0, dp(8)
+                                    opacity: 0 if root.has_requests else 1
+                                    height: 0 if root.has_requests else self.texture_size[1] + dp(16)
+                                MDBoxLayout:
+                                    id: requests_box
+                                    orientation: 'vertical'
+                                    size_hint_y: None
+                                    height: self.minimum_height
             MDBoxLayout:
                 size_hint_y: None
                 height: dp(78)
-                padding: dp(16), dp(12)
+                padding: max(dp(16), (root.width - dp(900)) / 2), dp(12)
                 md_bg_color: 1, 1, 1, .72
                 SolidButton:
                     id: cta
@@ -2252,89 +2295,109 @@
                     orientation: 'vertical'
                     size_hint_y: None
                     height: self.minimum_height
-                    padding: dp(16), dp(6), dp(16), dp(18)
+                    padding: max(dp(16), (root.width - dp(1000)) / 2), dp(6), max(dp(16), (root.width - dp(1000)) / 2), dp(18)
                     spacing: dp(14)
                     MDBoxLayout:
+                        id: columns
+                        orientation: 'horizontal' if root.width >= dp(720) else 'vertical'
                         size_hint_y: None
-                        height: self.minimum_height
-                        padding: dp(14), dp(12)
-                        spacing: dp(10)
-                        radius: dp(16)
-                        md_bg_color: T.rgba(T.ORANGE_BG)
-                        line_color: T.rgba(T.ORANGE, .45)
-                        line_width: 1.2
-                        Icon:
-                            name: 'permit'
-                            color: T.rgba(T.ORANGE)
-                            size_hint: None, None
-                            size: dp(20), dp(20)
-                            pos_hint: {'top': 1}
-                        Txt:
-                            text: 'Solo para emergencias o fuerza mayor (salud, familia, siniestros). Son de 1 a 3 días; para un descanso planificado usa Pedir Vacaciones.'
-                            font_size: sp(10.5)
-                            text_color: T.C_PRIMARY_DARK
-                    SectionLabel:
-                        title: 'ELIGE EL DÍA (MÁXIMO 3)'
-                    GlassCard:
-                        orientation: 'vertical'
-                        size_hint_y: None
-                        height: self.minimum_height
-                        radius: dp(22)
-                        padding: dp(14)
-                        CalendarPicker:
-                            id: calendar
-                            on_range_change: root.refresh()
-                    Txt:
-                        text: root.error
-                        font_size: sp(10)
-                        bold: True
-                        text_color: T.rgba(T.ORANGE, .95)
-                        opacity: 1 if root.error else 0
-                        height: self.texture_size[1] if root.error else 0
-                    SectionLabel:
-                        title: 'MOTIVOS FRECUENTES'
-                    MDBoxLayout:
-                        size_hint_y: None
-                        height: dp(32)
-                        spacing: dp(8)
-                        Chip:
-                            text: 'Emergencia familiar'
-                            on_release: root.use_reason('Emergencia familiar')
-                        Chip:
-                            text: 'Salud'
-                            on_release: root.use_reason('Problema de salud')
-                        Chip:
-                            text: 'Siniestro'
-                            on_release: root.use_reason('Siniestro en mi domicilio')
-                        MDWidget:
-                    ReasonCard:
-                        id: reason
-                        title: 'Motivo de fuerza mayor'
-                        placeholder: 'Explica qué ocurrió y por qué necesitas ausentarte…'
-                        on_text: root.refresh()
-                    SectionLabel:
-                        title: 'TUS SOLICITUDES'
-                    GlassCard:
-                        orientation: 'vertical'
-                        size_hint_y: None
-                        height: self.minimum_height
-                        radius: dp(22)
-                        padding: dp(16), dp(8)
-                        Txt:
-                            text: 'Aún no has enviado solicitudes de permiso.'
-                            font_size: sp(10.5)
-                            text_color: T.C_SECONDARY
-                            opacity: 0 if root.has_requests else 1
-                            height: 0 if root.has_requests else self.texture_size[1] + dp(16)
+                        height: max(left_col.height, right_col.height) if root.width >= dp(720) else left_col.height + right_col.height + dp(14)
+                        spacing: dp(20) if root.width >= dp(720) else dp(14)
                         MDBoxLayout:
-                            id: requests_box
+                            id: left_col
                             orientation: 'vertical'
                             size_hint_y: None
                             height: self.minimum_height
+                            pos_hint: {'top': 1}
+                            spacing: dp(14)
+                            MDBoxLayout:
+                                size_hint_y: None
+                                height: self.minimum_height
+                                padding: dp(14), dp(12)
+                                spacing: dp(10)
+                                radius: dp(16)
+                                md_bg_color: T.rgba(T.ORANGE_BG)
+                                line_color: T.rgba(T.ORANGE, .45)
+                                line_width: 1.2
+                                Icon:
+                                    name: 'permit'
+                                    color: T.rgba(T.ORANGE)
+                                    size_hint: None, None
+                                    size: dp(20), dp(20)
+                                    pos_hint: {'top': 1}
+                                Txt:
+                                    text: 'Solo para emergencias o fuerza mayor (salud, familia, siniestros). Son de 1 a 3 días; para un descanso planificado usa Pedir Vacaciones.'
+                                    font_size: sp(10.5)
+                                    text_color: T.C_PRIMARY_DARK
+                            SectionLabel:
+                                title: 'ELIGE EL DÍA (MÁXIMO 3)'
+                            GlassCard:
+                                orientation: 'vertical'
+                                size_hint_y: None
+                                height: self.minimum_height
+                                radius: dp(22)
+                                padding: dp(14)
+                                CalendarPicker:
+                                    id: calendar
+                                    on_range_change: root.refresh()
+                            Txt:
+                                text: root.error
+                                font_size: sp(10)
+                                bold: True
+                                text_color: T.rgba(T.ORANGE, .95)
+                                opacity: 1 if root.error else 0
+                                height: self.texture_size[1] if root.error else 0
+                        MDBoxLayout:
+                            id: right_col
+                            orientation: 'vertical'
+                            size_hint_y: None
+                            height: self.minimum_height
+                            pos_hint: {'top': 1}
+                            spacing: dp(14)
+                            SectionLabel:
+                                title: 'MOTIVOS FRECUENTES'
+                            MDBoxLayout:
+                                size_hint_y: None
+                                height: dp(32)
+                                spacing: dp(8)
+                                Chip:
+                                    text: 'Emergencia familiar'
+                                    on_release: root.use_reason('Emergencia familiar')
+                                Chip:
+                                    text: 'Salud'
+                                    on_release: root.use_reason('Problema de salud')
+                                Chip:
+                                    text: 'Siniestro'
+                                    on_release: root.use_reason('Siniestro en mi domicilio')
+                                MDWidget:
+                            ReasonCard:
+                                id: reason
+                                title: 'Motivo de fuerza mayor'
+                                placeholder: 'Explica qué ocurrió y por qué necesitas ausentarte…'
+                                on_text: root.refresh()
+                            SectionLabel:
+                                title: 'TUS SOLICITUDES'
+                            GlassCard:
+                                orientation: 'vertical'
+                                size_hint_y: None
+                                height: self.minimum_height
+                                radius: dp(22)
+                                padding: dp(16), dp(8)
+                                Txt:
+                                    text: 'Aún no has enviado solicitudes de permiso.'
+                                    font_size: sp(10.5)
+                                    text_color: T.C_SECONDARY
+                                    opacity: 0 if root.has_requests else 1
+                                    height: 0 if root.has_requests else self.texture_size[1] + dp(16)
+                                MDBoxLayout:
+                                    id: requests_box
+                                    orientation: 'vertical'
+                                    size_hint_y: None
+                                    height: self.minimum_height
             MDBoxLayout:
                 size_hint_y: None
                 height: dp(78)
-                padding: dp(16), dp(12)
+                padding: max(dp(16), (root.width - dp(900)) / 2), dp(12)
                 md_bg_color: 1, 1, 1, .72
                 SolidButton:
                     id: cta
@@ -2363,118 +2426,138 @@
                     orientation: 'vertical'
                     size_hint_y: None
                     height: self.minimum_height
-                    padding: dp(16), dp(6), dp(16), dp(18)
+                    padding: max(dp(16), (root.width - dp(1000)) / 2), dp(6), max(dp(16), (root.width - dp(1000)) / 2), dp(18)
                     spacing: dp(14)
-                    SectionLabel:
-                        title: 'TIPO DE LICENCIA'
-                    DropdownField:
-                        id: type_select
-                        placeholder: 'Selecciona el tipo de licencia'
-                        options: S.LICENSE_TYPES
-                        details: S.LICENSE_DETAILS
-                        on_select: root.refresh()
-                    SectionLabel:
-                        title: 'ADJUNTA TU LICENCIA'
                     MDBoxLayout:
+                        id: columns
+                        orientation: 'horizontal' if root.width >= dp(720) else 'vertical'
                         size_hint_y: None
-                        height: dp(116)
-                        spacing: dp(12)
-                        SourceTile:
-                            icon_name: 'upload'
-                            title: 'Subir archivo'
-                            subtitle: 'PDF, PNG o JPG'
-                            active: root.source == 'file'
-                            on_release: root.pick_file()
-                        SourceTile:
-                            icon_name: 'camera'
-                            title: 'Tomar foto'
-                            subtitle: 'Con la cámara'
-                            active: root.source == 'camera'
-                            on_release: root.take_photo()
-                    Txt:
-                        text: root.notice
-                        font_size: sp(10)
-                        bold: True
-                        text_color: T.rgba(T.ORANGE, .95)
-                        opacity: 1 if root.notice else 0
-                        height: self.texture_size[1] if root.notice else 0
-                    GlassCard:
-                        size_hint_y: None
-                        height: dp(76) if root.file_name else 0
-                        opacity: 1 if root.file_name else 0
-                        disabled: not root.file_name
-                        radius: dp(18)
-                        padding: dp(12), dp(10)
-                        spacing: dp(12)
-                        line_color: (T.rgba(T.EMERALD, .6) if root.file_ok else T.rgba(T.ORANGE, .7)) if root.file_name else T.C_GLASS_BORDER
-                        line_width: 1.4
-                        MDFloatLayout:
-                            size_hint: None, None
-                            size: dp(54), dp(54)
-                            pos_hint: {'center_y': .5}
-                            IconTile:
-                                pos_hint: {'x': 0, 'y': 0}
-                                size_hint: 1, 1
-                                icon_name: 'file'
-                                icon_color: T.C_PRIMARY
-                                md_bg_color: T.C_BG
-                                radius: dp(14)
-                            Image:
-                                source: root.file_path if root.file_is_image else ''
-                                fit_mode: 'cover'
-                                pos_hint: {'x': 0, 'y': 0}
-                                size_hint: 1, 1
-                                opacity: 1 if root.file_is_image else 0
+                        height: max(left_col.height, right_col.height) if root.width >= dp(720) else left_col.height + right_col.height + dp(14)
+                        spacing: dp(20) if root.width >= dp(720) else dp(14)
                         MDBoxLayout:
-                            orientation: 'vertical'
-                            spacing: dp(3)
-                            MDWidget:
-                            Txt:
-                                text: root.file_name
-                                font_size: sp(12)
-                                bold: True
-                                text_color: T.C_TEXT
-                                shorten: True
-                                shorten_from: 'right'
-                                height: dp(16)
-                            Txt:
-                                text: root.file_msg
-                                font_size: sp(9.5)
-                                bold: True
-                                text_color: T.rgba(T.EMERALD) if root.file_ok else T.rgba(T.ORANGE)
-                            MDWidget:
-                        IconButton:
-                            icon_name: 'close'
-                            icon_color: T.C_SECONDARY
-                            md_bg_color: T.C_TINT_10
-                            radius: dp(12)
-                            size_hint: None, None
-                            size: dp(34), dp(34)
-                            pos_hint: {'center_y': .5}
-                            on_release: root.remove_file()
-                    SectionLabel:
-                        title: 'TUS SOLICITUDES'
-                    GlassCard:
-                        orientation: 'vertical'
-                        size_hint_y: None
-                        height: self.minimum_height
-                        radius: dp(22)
-                        padding: dp(16), dp(8)
-                        Txt:
-                            text: 'Aún no has subido licencias.'
-                            font_size: sp(10.5)
-                            text_color: T.C_SECONDARY
-                            opacity: 0 if root.has_requests else 1
-                            height: 0 if root.has_requests else self.texture_size[1] + dp(16)
-                        MDBoxLayout:
-                            id: requests_box
+                            id: left_col
                             orientation: 'vertical'
                             size_hint_y: None
                             height: self.minimum_height
+                            pos_hint: {'top': 1}
+                            spacing: dp(14)
+                            SectionLabel:
+                                title: 'TIPO DE LICENCIA'
+                            DropdownField:
+                                id: type_select
+                                placeholder: 'Selecciona el tipo de licencia'
+                                options: S.LICENSE_TYPES
+                                details: S.LICENSE_DETAILS
+                                on_select: root.refresh()
+                            SectionLabel:
+                                title: 'ADJUNTA TU LICENCIA'
+                            MDBoxLayout:
+                                size_hint_y: None
+                                height: dp(116)
+                                spacing: dp(12)
+                                SourceTile:
+                                    icon_name: 'upload'
+                                    title: 'Subir archivo'
+                                    subtitle: 'PDF, PNG o JPG'
+                                    active: root.source == 'file'
+                                    on_release: root.pick_file()
+                                SourceTile:
+                                    icon_name: 'camera'
+                                    title: 'Tomar foto'
+                                    subtitle: 'Con la cámara'
+                                    active: root.source == 'camera'
+                                    on_release: root.take_photo()
+                            Txt:
+                                text: root.notice
+                                font_size: sp(10)
+                                bold: True
+                                text_color: T.rgba(T.ORANGE, .95)
+                                opacity: 1 if root.notice else 0
+                                height: self.texture_size[1] if root.notice else 0
+                            GlassCard:
+                                size_hint_y: None
+                                height: dp(76) if root.file_name else 0
+                                opacity: 1 if root.file_name else 0
+                                disabled: not root.file_name
+                                radius: dp(18)
+                                padding: dp(12), dp(10)
+                                spacing: dp(12)
+                                line_color: (T.rgba(T.EMERALD, .6) if root.file_ok else T.rgba(T.ORANGE, .7)) if root.file_name else T.C_GLASS_BORDER
+                                line_width: 1.4
+                                MDFloatLayout:
+                                    size_hint: None, None
+                                    size: dp(54), dp(54)
+                                    pos_hint: {'center_y': .5}
+                                    IconTile:
+                                        pos_hint: {'x': 0, 'y': 0}
+                                        size_hint: 1, 1
+                                        icon_name: 'file'
+                                        icon_color: T.C_PRIMARY
+                                        md_bg_color: T.C_BG
+                                        radius: dp(14)
+                                    Image:
+                                        source: root.file_path if root.file_is_image else ''
+                                        fit_mode: 'cover'
+                                        pos_hint: {'x': 0, 'y': 0}
+                                        size_hint: 1, 1
+                                        opacity: 1 if root.file_is_image else 0
+                                MDBoxLayout:
+                                    orientation: 'vertical'
+                                    spacing: dp(3)
+                                    MDWidget:
+                                    Txt:
+                                        text: root.file_name
+                                        font_size: sp(12)
+                                        bold: True
+                                        text_color: T.C_TEXT
+                                        shorten: True
+                                        shorten_from: 'right'
+                                        height: dp(16)
+                                    Txt:
+                                        text: root.file_msg
+                                        font_size: sp(9.5)
+                                        bold: True
+                                        text_color: T.rgba(T.EMERALD) if root.file_ok else T.rgba(T.ORANGE)
+                                    MDWidget:
+                                IconButton:
+                                    icon_name: 'close'
+                                    icon_color: T.C_SECONDARY
+                                    md_bg_color: T.C_TINT_10
+                                    radius: dp(12)
+                                    size_hint: None, None
+                                    size: dp(34), dp(34)
+                                    pos_hint: {'center_y': .5}
+                                    on_release: root.remove_file()
+                        MDBoxLayout:
+                            id: right_col
+                            orientation: 'vertical'
+                            size_hint_y: None
+                            height: self.minimum_height
+                            pos_hint: {'top': 1}
+                            spacing: dp(14)
+                            SectionLabel:
+                                title: 'TUS SOLICITUDES'
+                            GlassCard:
+                                orientation: 'vertical'
+                                size_hint_y: None
+                                height: self.minimum_height
+                                radius: dp(22)
+                                padding: dp(16), dp(8)
+                                Txt:
+                                    text: 'Aún no has subido licencias.'
+                                    font_size: sp(10.5)
+                                    text_color: T.C_SECONDARY
+                                    opacity: 0 if root.has_requests else 1
+                                    height: 0 if root.has_requests else self.texture_size[1] + dp(16)
+                                MDBoxLayout:
+                                    id: requests_box
+                                    orientation: 'vertical'
+                                    size_hint_y: None
+                                    height: self.minimum_height
             MDBoxLayout:
                 size_hint_y: None
                 height: dp(78)
-                padding: dp(16), dp(12)
+                padding: max(dp(16), (root.width - dp(900)) / 2), dp(12)
                 md_bg_color: 1, 1, 1, .72
                 SolidButton:
                     id: cta
@@ -2625,118 +2708,138 @@
                     orientation: 'vertical'
                     size_hint_y: None
                     height: self.minimum_height
-                    padding: dp(16), dp(6), dp(16), dp(18)
+                    padding: max(dp(16), (root.width - dp(1000)) / 2), dp(6), max(dp(16), (root.width - dp(1000)) / 2), dp(18)
                     spacing: dp(14)
-                    SectionLabel:
-                        title: 'NUEVO DOCUMENTO'
-                    DropdownField:
-                        id: type_select
-                        placeholder: 'Tipo de documento'
-                        options: S.DOC_TYPES
-                        details: S.DOC_DETAILS
-                        on_select: root.refresh()
-                    FormField:
-                        id: title_in
-                        hint: 'Título (ej. Anexo de Contrato — Noviembre)'
-                        max_chars: 80
-                        on_text: root.refresh()
-                    FormField:
-                        id: pages_in
-                        hint: 'Número de páginas'
-                        input_filter: 'int'
-                        max_chars: 3
-                        on_text: root.refresh()
-                    SectionLabel:
-                        title: 'FECHA LÍMITE PARA FIRMAR'
-                    GlassCard:
-                        orientation: 'vertical'
+                    MDBoxLayout:
+                        id: columns
+                        orientation: 'horizontal' if root.width >= dp(720) else 'vertical'
                         size_hint_y: None
-                        height: self.minimum_height
-                        radius: dp(22)
-                        padding: dp(14)
-                        CalendarPicker:
-                            id: calendar
-                            single: True
-                            on_range_change: root.refresh()
-                    PressableBox:
-                        size_hint_y: None
-                        height: dp(58)
-                        padding: dp(14), 0
-                        spacing: dp(12)
-                        radius: dp(14)
-                        md_bg_color: T.rgba(T.ORANGE_BG) if root.urgent else (1, 1, 1, .7)
-                        line_color: T.rgba(T.ORANGE, .6) if root.urgent else T.C_BG
-                        line_width: 1.6
-                        on_release: root.toggle_urgent()
-                        MDFloatLayout:
-                            size_hint: None, None
-                            size: dp(24), dp(24)
-                            pos_hint: {'center_y': .5}
-                            MDBoxLayout:
-                                pos_hint: {'x': 0, 'y': 0}
-                                size_hint: 1, 1
-                                radius: dp(8)
-                                md_bg_color: T.rgba(T.ORANGE) if root.urgent else (0, 0, 0, 0)
-                                line_color: T.rgba(T.ORANGE) if root.urgent else T.C_SECONDARY
-                                line_width: 1.5
-                            Icon:
-                                name: 'check'
-                                color: 1, 1, 1, 1
-                                opacity: 1 if root.urgent else 0
-                                size_hint: None, None
-                                size: dp(14), dp(14)
-                                pos_hint: {'center_x': .5, 'center_y': .5}
+                        height: max(left_col.height, right_col.height) if root.width >= dp(720) else left_col.height + right_col.height + dp(14)
+                        spacing: dp(20) if root.width >= dp(720) else dp(14)
                         MDBoxLayout:
-                            orientation: 'vertical'
-                            MDWidget:
-                            Txt:
-                                text: 'Marcar como urgente'
-                                font_size: sp(12.5)
-                                bold: True
-                                text_color: T.C_TEXT
-                            Txt:
-                                text: 'Los trabajadores reciben un aviso al iniciar sesión'
-                                font_size: sp(9.5)
-                                text_color: T.C_SECONDARY
-                            MDWidget:
-                    Txt:
-                        text: root.error
-                        font_size: sp(10)
-                        bold: True
-                        text_color: T.rgba(T.ORANGE, .95)
-                        opacity: 1 if root.error else 0
-                        height: self.texture_size[1] if root.error else 0
-                    Txt:
-                        text: root.success
-                        font_size: sp(10.5)
-                        bold: True
-                        text_color: T.rgba(T.EMERALD)
-                        opacity: 1 if root.success else 0
-                        height: self.texture_size[1] if root.success else 0
-                    SectionLabel:
-                        title: 'DOCUMENTOS PUBLICADOS'
-                        count: root.docs_count
-                    GlassCard:
-                        orientation: 'vertical'
-                        size_hint_y: None
-                        height: self.minimum_height
-                        radius: dp(22)
-                        padding: dp(16), dp(8)
-                        Txt:
-                            text: 'No hay documentos pendientes de firma.'
-                            font_size: sp(10.5)
-                            text_color: T.C_SECONDARY
-                            opacity: 0 if root.has_docs else 1
-                            height: 0 if root.has_docs else self.texture_size[1] + dp(16)
-                        MDBoxLayout:
-                            id: docs_box
+                            id: left_col
                             orientation: 'vertical'
                             size_hint_y: None
                             height: self.minimum_height
+                            pos_hint: {'top': 1}
+                            spacing: dp(14)
+                            SectionLabel:
+                                title: 'NUEVO DOCUMENTO'
+                            DropdownField:
+                                id: type_select
+                                placeholder: 'Tipo de documento'
+                                options: S.DOC_TYPES
+                                details: S.DOC_DETAILS
+                                on_select: root.refresh()
+                            FormField:
+                                id: title_in
+                                hint: 'Título (ej. Anexo de Contrato — Noviembre)'
+                                max_chars: 80
+                                on_text: root.refresh()
+                            FormField:
+                                id: pages_in
+                                hint: 'Número de páginas'
+                                input_filter: 'int'
+                                max_chars: 3
+                                on_text: root.refresh()
+                            SectionLabel:
+                                title: 'FECHA LÍMITE PARA FIRMAR'
+                            GlassCard:
+                                orientation: 'vertical'
+                                size_hint_y: None
+                                height: self.minimum_height
+                                radius: dp(22)
+                                padding: dp(14)
+                                CalendarPicker:
+                                    id: calendar
+                                    single: True
+                                    on_range_change: root.refresh()
+                        MDBoxLayout:
+                            id: right_col
+                            orientation: 'vertical'
+                            size_hint_y: None
+                            height: self.minimum_height
+                            pos_hint: {'top': 1}
+                            spacing: dp(14)
+                            PressableBox:
+                                size_hint_y: None
+                                height: dp(58)
+                                padding: dp(14), 0
+                                spacing: dp(12)
+                                radius: dp(14)
+                                md_bg_color: T.rgba(T.ORANGE_BG) if root.urgent else (1, 1, 1, .7)
+                                line_color: T.rgba(T.ORANGE, .6) if root.urgent else T.C_BG
+                                line_width: 1.6
+                                on_release: root.toggle_urgent()
+                                MDFloatLayout:
+                                    size_hint: None, None
+                                    size: dp(24), dp(24)
+                                    pos_hint: {'center_y': .5}
+                                    MDBoxLayout:
+                                        pos_hint: {'x': 0, 'y': 0}
+                                        size_hint: 1, 1
+                                        radius: dp(8)
+                                        md_bg_color: T.rgba(T.ORANGE) if root.urgent else (0, 0, 0, 0)
+                                        line_color: T.rgba(T.ORANGE) if root.urgent else T.C_SECONDARY
+                                        line_width: 1.5
+                                    Icon:
+                                        name: 'check'
+                                        color: 1, 1, 1, 1
+                                        opacity: 1 if root.urgent else 0
+                                        size_hint: None, None
+                                        size: dp(14), dp(14)
+                                        pos_hint: {'center_x': .5, 'center_y': .5}
+                                MDBoxLayout:
+                                    orientation: 'vertical'
+                                    MDWidget:
+                                    Txt:
+                                        text: 'Marcar como urgente'
+                                        font_size: sp(12.5)
+                                        bold: True
+                                        text_color: T.C_TEXT
+                                    Txt:
+                                        text: 'Los trabajadores reciben un aviso al iniciar sesión'
+                                        font_size: sp(9.5)
+                                        text_color: T.C_SECONDARY
+                                    MDWidget:
+                            Txt:
+                                text: root.error
+                                font_size: sp(10)
+                                bold: True
+                                text_color: T.rgba(T.ORANGE, .95)
+                                opacity: 1 if root.error else 0
+                                height: self.texture_size[1] if root.error else 0
+                            Txt:
+                                text: root.success
+                                font_size: sp(10.5)
+                                bold: True
+                                text_color: T.rgba(T.EMERALD)
+                                opacity: 1 if root.success else 0
+                                height: self.texture_size[1] if root.success else 0
+                            SectionLabel:
+                                title: 'DOCUMENTOS PUBLICADOS'
+                                count: root.docs_count
+                            GlassCard:
+                                orientation: 'vertical'
+                                size_hint_y: None
+                                height: self.minimum_height
+                                radius: dp(22)
+                                padding: dp(16), dp(8)
+                                Txt:
+                                    text: 'No hay documentos pendientes de firma.'
+                                    font_size: sp(10.5)
+                                    text_color: T.C_SECONDARY
+                                    opacity: 0 if root.has_docs else 1
+                                    height: 0 if root.has_docs else self.texture_size[1] + dp(16)
+                                MDBoxLayout:
+                                    id: docs_box
+                                    orientation: 'vertical'
+                                    size_hint_y: None
+                                    height: self.minimum_height
             MDBoxLayout:
                 size_hint_y: None
                 height: dp(78)
-                padding: dp(16), dp(12)
+                padding: max(dp(16), (root.width - dp(900)) / 2), dp(12)
                 md_bg_color: 1, 1, 1, .72
                 SolidButton:
                     id: cta

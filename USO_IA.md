@@ -408,3 +408,17 @@ descripción (`solicitudes.DOC_TYPES` / `LICENSE_TYPES`), y el menú
 de los tipos de documento se acortaron para que quepan en la tarjeta del
 trabajador; la descripción conserva el texto completo.
 
+
+
+### Diseño adaptable a pantallas grandes
+
+Pedido del estudiante: al poner la app en pantalla completa (tablets, etc.) la
+interfaz debe reorganizarse. La IA lo resolvió con un punto de corte de
+720 dp: dos columnas alineadas arriba y ancho máximo centrado en el Inicio y
+en las 4 pantallas de formulario; una columna en el teléfono. Se probó con
+capturas a 420x880, 820x1180 y 1280x800, y con una prueba de clics reales
+(login, firma, botón volver, menús, calendario, aviso, panel admin) en los
+tres tamaños. Durante la prueba aparecieron y se corrigieron dos fallos
+previos: el separador de cada fila de "Liquidaciones recientes" era un hijo
+de un BoxLayout horizontal (ocupaba una columna a la derecha) y la ficha
+naranja del banner vacío quedaba dibujada en la esquina de la ventana.

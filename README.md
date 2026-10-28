@@ -246,6 +246,27 @@ correspondiente y la notificación **se elimina**
 (`InterfazRRHHApp.open_notification()`). Las respuestas pendientes
 sobreviven a cerrar la app: al volver a iniciar sesión se retoman.
 
+## Pantallas grandes (tablets y pantalla completa)
+
+La interfaz se reorganiza sola al cambiar el tamaño de la ventana (por
+ejemplo al maximizarla o en una tablet), sin código por plataforma: todo
+está en `interfazrrhh.kv` con expresiones sobre `root.width`.
+
+- **Menos de 720 dp (teléfono):** una sola columna, como siempre.
+- **720 dp o más (tablet / pantalla completa):** el contenido pasa a **dos
+  columnas** alineadas arriba y se limita a un ancho máximo (1100 dp en el
+  Inicio, 1000 dp en los formularios) centrado, para que las tarjetas no se
+  estiren. Inicio: izquierda = saludo, estadísticas y acciones rápidas;
+  derecha = tareas pendientes y liquidaciones. Vacaciones, Permiso, Licencia y
+  Administración: formulario/calendario a la izquierda y motivo/listas a la
+  derecha. La barra inferior y el botón de enviar también se acotan.
+- Las pantallas de tarjeta fija (Login, Registro, Firmar, Éxito) ya quedaban
+  centradas y no cambian.
+
+Cada pantalla arma sus dos columnas con un `MDBoxLayout` cuya `orientation` es
+`'horizontal'` si `root.width >= dp(720)` y `'vertical'` si no; las dos
+columnas se apilan en el mismo orden en el teléfono.
+
 ## Panel de administración (crear documentos para firmar)
 
 Los documentos que los trabajadores firman los **crea una cuenta
