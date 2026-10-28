@@ -35,6 +35,7 @@ from datetime import datetime
 
 from kivy.animation import Animation
 from kivy.clock import Clock
+from kivy.logger import Logger
 from kivy.core.window import Window
 from kivy.metrics import dp
 from kivy.properties import (BooleanProperty, ListProperty, NumericProperty,
@@ -104,6 +105,28 @@ DEFAULT_RECENT = [
     dict(name='Liquidación Mayo 2026',    date='01 Jun 2026', filesize='145 KB', offline=False),
     dict(name='Contrato Renovación 2026', date='15 Jan 2026', filesize='512 KB', offline=True),
 ]
+
+
+def _coerce_bool(value):
+    """True/False si 'value' es un booleano o 'true'/'false' (texto); None si no."""
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str) and value.strip().lower() in ('true', 'false'):
+        return value.strip().lower() == 'true'
+    return None
+
+
+def _coerce_int(value):
+    """Entero >= 0 si 'value' es un numero o un texto numerico; None si no."""
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, (int, float)) or (isinstance(value, str) and value.strip().lstrip('-').isdigit()):
+        try:
+            return max(0, int(value))
+        except (ValueError, OverflowError):
+            return None
+    return None
+
 
 DM = DataManager()
 PENDING, RECENT = DM.load_documents(DEFAULT_PENDING, DEFAULT_RECENT)
@@ -316,7 +339,7 @@ class SignPanel(GlassCard):
 
 
 # ============================================================ PANTALLAS (SCREENS)
-# Las 4 pantallas navegables de la maqueta: Login, Inicio, Firmar y Exito.
+# Las 5 pantallas navegables de la maqueta: Login, Registro, Inicio, Firmar y Exito.
 # Cada una es una kivy.uix.screenmanager.Screen; el ScreenManager (creado en
 # InterfazRRHHApp.build()) las muestra/oculta con una transicion animada al
 # cambiar 'sm.current'. El diseno de cada pantalla vive en su regla
@@ -590,6 +613,7 @@ class InterfazRRHHApp(MDApp):
                        self.home_screen, self.sign_screen, self.success_screen):
             self.sm.add_widget(screen)
         self.notification_overlay = None
+        self._remote_applied = {}   # ultimo valor remoto ya aplicado (evita repintar sin cambios)
 
         # Remote Config: la app ya arranco completa con los valores locales
         # (SHOW_DESKTOP_CTA, RECENT) -- este fetch es "best effort" en
@@ -612,11 +636,41 @@ class InterfazRRHHApp(MDApp):
         """Se llama SOLO si remote_config.fetch() trajo un JSON valido
         (Activate). Si nunca se llama -- sin internet, servidor caido, JSON
         todavia no existe en GitHub -- la app sigue con lo que ya tenia
-        (Fallback), sin que haga falta ningun 'else' aqui."""
+        (Fallback), sin que haga falta ningun 'else' aqui.
+
+        Como el valor se re-consulta cada pocos segundos (polling), dos
+        cuidados: (1) cada valor se valida/convierte y, si es invalido
+        (ej. "3" entre comillas o null por un error de tipeo al editar el
+        JSON en vivo), se ignora y se mantiene el anterior; (2) solo se
+        toca la pantalla si el valor realmente cambio, para no reconstruir
+        las listas cada 5 segundos."""
         dashboard = self.home_screen.ids.dashboard
-        dashboard.banner_text = cfg['banner_message']
-        dashboard.set_desktop_cta_visible(cfg['show_desktop_cta'])
-        dashboard.set_max_recent(cfg['max_recent_docs'])
+        applied = self._remote_applied
+
+        banner = cfg.get('banner_message')
+        if not isinstance(banner, str):
+            Logger.warning('RemoteConfig: banner_message invalido (%r) -- se ignora', banner)
+        elif applied.get('banner_message') != banner:
+            applied['banner_message'] = banner
+            dashboard.banner_text = banner
+            if self.notification_overlay:
+                self.notification_overlay.message = banner
+
+        cta = _coerce_bool(cfg.get('show_desktop_cta'))
+        if cta is None:
+            Logger.warning('RemoteConfig: show_desktop_cta invalido (%r) -- se ignora',
+                           cfg.get('show_desktop_cta'))
+        elif applied.get('show_desktop_cta') != cta:
+            applied['show_desktop_cta'] = cta
+            dashboard.set_desktop_cta_visible(cta)
+
+        max_recent = _coerce_int(cfg.get('max_recent_docs'))
+        if max_recent is None:
+            Logger.warning('RemoteConfig: max_recent_docs invalido (%r) -- se ignora',
+                           cfg.get('max_recent_docs'))
+        elif applied.get('max_recent_docs') != max_recent:
+            applied['max_recent_docs'] = max_recent
+            dashboard.set_max_recent(max_recent)
 
     # ---------------------------------------------------- notificaciones
     def show_notifications(self):

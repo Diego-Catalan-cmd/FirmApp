@@ -221,6 +221,12 @@ vuelve a pedir el mismo valor mientras sigue abierta, así que un cambio
 en la fuente remota se nota solo, sin tener que cerrar y volver a abrir
 la app.
 
+Dos protecciones para poder editar el JSON en vivo sin riesgo
+(`_apply_remote_config()` en `main.py`): cada valor se valida y, si es
+inválido (por ejemplo `"3"` entre comillas o `null`), se ignora y se
+mantiene el anterior; y la pantalla solo se repinta cuando un valor
+realmente cambió, no en cada ciclo de polling.
+
 Hay dos formas de cambiar el valor remoto:
 - **Subiéndolo a GitHub** (la fuente real del proyecto): editar
   `remote/config.json`, hacer commit y push a `main`. Funciona, pero

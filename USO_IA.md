@@ -343,3 +343,18 @@ al abrir la app. Se agregó:
   forzó un ciclo de polling, y se confirmó que `banner_text` y
   `max_recent` del Dashboard cambiaron al nuevo valor sin reiniciar el
   proceso.
+
+### Revisión general y correcciones
+
+A pedido del estudiante ("dale una vuelta al proyecto"), la IA revisó el
+código, lo ejecutó en modo headless y reportó los problemas antes de
+tocar nada; el estudiante aprobó los cambios (sí/no) uno a uno:
+
+- Remote Config se caía con valores mal tipeados (`"3"`, `null`) y el
+  polling reconstruía las listas cada 5 s aunque no hubiera cambios: ahora
+  se valida cada valor (si es inválido se ignora) y solo se repinta si
+  cambió.
+- `data_manager.py`: el mismo RUT en distinto formato (`12.345.678-5` /
+  `123456785`) creaba cuentas distintas; ahora la clave se normaliza.
+- El aviso grande de notificaciones ahora sigue al banner si este cambia
+  con el aviso abierto; se corrigió un comentario desactualizado.

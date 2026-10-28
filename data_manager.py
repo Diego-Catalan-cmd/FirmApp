@@ -41,6 +41,16 @@ def _hash_password(password):
     return hashlib.sha256(password.encode('utf-8')).hexdigest()
 
 
+def _normalize_key(identifier):
+    """Clave canonica de una cuenta: el correo en minusculas, o el RUT solo
+    con digitos y K mayuscula -- asi '12.345.678-5' y '123456785' son la
+    misma cuenta (no se puede registrar dos veces en distinto formato)."""
+    text = identifier.strip()
+    if '@' in text:
+        return text.lower()
+    return ''.join(c for c in text if c.isdigit() or c in 'kK').upper()
+
+
 class DataManager:
     """
     Agrupa toda la persistencia de la app. InterfazRRHHApp crea una sola
@@ -90,7 +100,7 @@ class DataManager:
     def register_user(self, identifier, password):
         """Crea una cuenta nueva. Devuelve (ok, mensaje) -- ok=False si ya
         existe una cuenta con ese identificador o si fallo el guardado."""
-        key = identifier.strip().lower()
+        key = _normalize_key(identifier)
         users = self.load_users()
         if key in users:
             return False, 'Ya existe una cuenta con ese RUT o correo.'
@@ -102,7 +112,7 @@ class DataManager:
     def authenticate(self, identifier, password):
         """True si el identificador y la contrasena coinciden con una
         cuenta registrada en usuarios.json."""
-        key = identifier.strip().lower()
+        key = _normalize_key(identifier)
         user = self.load_users().get(key)
         if not user:
             return False
