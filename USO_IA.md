@@ -399,3 +399,12 @@ documentos son globales (para todos los trabajadores), no por usuario.
 Probado en headless: login admin, creación, título duplicado rechazado,
 persistencia, ver el documento como trabajador, retirarlo.
 
+### Listas de los menús desplegables
+
+El estudiante entregó las listas reales (11 tipos de documento laboral y los
+7 tipos de licencia médica chilena). La IA las usó como nombre corto +
+descripción (`solicitudes.DOC_TYPES` / `LICENSE_TYPES`), y el menú
+(`DropdownField`) ahora muestra la descripción bajo cada opción. Los nombres
+de los tipos de documento se acortaron para que quepan en la tarjeta del
+trabajador; la descripción conserva el texto completo.
+

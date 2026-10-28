@@ -27,7 +27,7 @@ from kivy.graphics import (Color, RoundedRectangle, Rectangle, Line, Ellipse,
 from kivy.graphics.texture import Texture
 from kivy.metrics import dp
 from kivy.properties import (ListProperty, NumericProperty, StringProperty,
-                             BooleanProperty, ObjectProperty)
+                             BooleanProperty, ObjectProperty, DictProperty)
 from kivy.uix.behaviors import ButtonBehavior
 from kivy.uix.stencilview import StencilView
 from kivy.uix.textinput import TextInput
@@ -906,6 +906,7 @@ class ReasonCard(GlassCard):
 class OptionRow(PressableBox):
     """Una opcion del menu desplegable."""
     text = StringProperty('')
+    detail = StringProperty('')
     selected = BooleanProperty(False)
     owner = ObjectProperty(None, allownone=True)
 
@@ -925,6 +926,7 @@ class DropdownField(MDBoxLayout):
     __events__ = ('on_select',)
 
     options = ListProperty([])
+    details = DictProperty({})          # descripcion opcional de cada opcion
     placeholder = StringProperty('Selecciona una opción')
     selected = StringProperty('')
     expanded = BooleanProperty(False)
@@ -936,11 +938,16 @@ class DropdownField(MDBoxLayout):
         if 'options_box' in self.ids:
             self._build_options()
 
+    def on_details(self, *args):
+        if 'options_box' in self.ids:
+            self._build_options()
+
     def _build_options(self):
         box = self.ids.options_box
         box.clear_widgets()
         for opt in self.options:
             box.add_widget(OptionRow(text=opt, owner=self,
+                                     detail=self.details.get(opt, ''),
                                      selected=(opt == self.selected)))
 
     def toggle(self):

@@ -1833,19 +1833,29 @@
 
 <OptionRow>:
     size_hint_y: None
-    height: dp(46)
-    padding: dp(14), 0
+    height: max(dp(46), opt_col.height + dp(20))
+    padding: dp(14), dp(10)
     spacing: dp(8)
     radius: dp(12)
     md_bg_color: T.C_TINT_10 if root.selected else (0, 0, 0, 0)
-    TxtFijo:
-        text: root.text
-        font_name: T.FONT
-        font_size: sp(12)
-        bold: root.selected
-        text_color: T.C_PRIMARY_DARK if root.selected else T.C_TEXT
-        halign: 'left'
-        text_size: self.size
+    MDBoxLayout:
+        id: opt_col
+        orientation: 'vertical'
+        size_hint_y: None
+        height: self.minimum_height
+        spacing: dp(2)
+        pos_hint: {'center_y': .5}
+        Txt:
+            text: root.text
+            font_size: sp(12)
+            bold: True
+            text_color: T.C_PRIMARY_DARK if root.selected else T.C_TEXT
+        Txt:
+            text: root.detail
+            font_size: sp(9.5)
+            text_color: T.C_SECONDARY
+            opacity: 1 if root.detail else 0
+            height: self.texture_size[1] if root.detail else 0
     Icon:
         name: 'check'
         color: T.C_PRIMARY
@@ -1872,6 +1882,8 @@
         on_release: root.toggle()
         TxtFijo:
             text: root.selected if root.selected else root.placeholder
+            shorten: True
+            shorten_from: 'right'
             font_name: T.FONT
             font_size: sp(13)
             bold: bool(root.selected)
@@ -2359,6 +2371,7 @@
                         id: type_select
                         placeholder: 'Selecciona el tipo de licencia'
                         options: S.LICENSE_TYPES
+                        details: S.LICENSE_DETAILS
                         on_select: root.refresh()
                     SectionLabel:
                         title: 'ADJUNTA TU LICENCIA'
@@ -2620,6 +2633,7 @@
                         id: type_select
                         placeholder: 'Tipo de documento'
                         options: S.DOC_TYPES
+                        details: S.DOC_DETAILS
                         on_select: root.refresh()
                     FormField:
                         id: title_in

@@ -209,7 +209,7 @@ con el mismo diseño (tarjetas "glass", misma paleta) y un botón fijo abajo:
 |---|---|---|
 | **Pedir Vacaciones** (`VacationScreen`) | Calendario (`CalendarPicker`) para elegir inicio y término + motivo | Desde hoy, dentro del saldo de días libres (12), motivo ≥ 10 caracteres — `validate_vacation()` |
 | **Solicitar Permiso** (`PermitScreen`) | Igual, para fuerza mayor; motivos frecuentes tocables (`Chip`) | De **1 a 3 días** (no son vacaciones): el calendario deshabilita los días que pasarían el máximo — `validate_permit()` |
-| **Subir Licencia** (`LicenseScreen`) | Menú desplegable con el tipo de licencia (`DropdownField`) + dos opciones: **subir archivo** o **tomar foto** | `validate_license_file()` |
+| **Subir Licencia** (`LicenseScreen`) | Menú desplegable con los 7 tipos de licencia médica, cada uno con su descripción (`DropdownField`, `solicitudes.LICENSE_TYPES`) + dos opciones: **subir archivo** o **tomar foto** | `validate_license_file()` |
 
 - **Calendario:** 1er toque = primer día, 2do toque = último día (tocar de
   nuevo el mismo día = solo ese día). Los días pasados quedan deshabilitados.
@@ -263,7 +263,11 @@ logra con el campo `"role": "admin"` en `data/usuarios.json`
 (`DataManager.get_role()`).
 
 **Cómo crear un documento:** iniciar sesión como admin → elegir el tipo
-(Contrato, Liquidación, Anexo, Finiquito) → título → páginas → fecha límite en
+(11 tipos: Contrato de trabajo, Anexo de contrato, Liquidación de sueldo,
+Registro de asistencia, Pacto de horas extra, Comprobante de vacaciones,
+Reglamento interno, Protocolo o normativa, Capacitación y EPP, Pacto de
+modalidad especial y Finiquito laboral; cada uno con su descripción en el
+menú, `solicitudes.DOC_TYPES`) → título → páginas → fecha límite en
 el calendario → opcionalmente *urgente* → **Publicar documento**. Reglas
 (`solicitudes.validate_document()`): título único de 5 a 80 caracteres, fecha
 desde hoy, 1 a 200 páginas. El documento se guarda en `data/documentos.json`

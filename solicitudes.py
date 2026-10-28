@@ -21,19 +21,74 @@ PERMIT_MAX_DAYS = 3        # un permiso es de 1 a 3 dias (no son vacaciones)
 REASON_MIN = 10            # largo minimo del motivo (caracteres)
 REASON_MAX = 300
 
-LICENSE_TYPES = [
-    'Licencia médica (enfermedad común)',
-    'Licencia por accidente laboral',
-    'Licencia pre y postnatal',
-    'Licencia por enfermedad grave de hijo(a)',
+# Tipos de licencia medica (nombre corto, descripcion): el menu desplegable
+# muestra el nombre y, debajo, la descripcion.
+_LICENSES = [
+    ('Tipo 1 · Enfermedad o accidente común',
+     'Cubre ausencias por patologías de origen no laboral ni profesional.'),
+    ('Tipo 2 · Prórroga de medicina preventiva',
+     'Para trabajadores sanos o en riesgo que deben someterse a exámenes o '
+     'tratamientos que eviten el avance de enfermedades crónicas.'),
+    ('Tipo 3 · Maternal (pre y postnatal)',
+     'Descansos pre y postnatal de la protección a la maternidad '
+     '(Art. 195 del Código del Trabajo).'),
+    ('Tipo 4 · Enfermedad grave de hijo menor de 1 año',
+     'Permite a la madre o al padre ausentarse para cuidar al lactante ante '
+     'una afección grave.'),
+    ('Tipo 5 · Accidente del trabajo o del trayecto',
+     'Cubre incidentes ocurridos en el trabajo o en el trayecto directo '
+     'entre la casa y el trabajo.'),
+    ('Tipo 6 · Enfermedad profesional',
+     'Patología causada de manera directa por el ejercicio de la profesión '
+     'u oficio.'),
+    ('Tipo 7 · Patología del embarazo',
+     'Licencias preventivas o curativas por complicaciones durante la '
+     'gestación.'),
 ]
+LICENSE_TYPES = [name for name, _ in _LICENSES]
+LICENSE_DETAILS = dict(_LICENSES)
 LICENSE_MIN_BYTES = 10 * 1024          # un documento real pesa mas de 10 KB
 LICENSE_MAX_BYTES = 10 * 1024 * 1024   # tope de 10 MB
 LICENSE_MIN_SIDE = 400                 # px: una foto legible de un documento
 LICENSE_EXTS = ('.pdf', '.png', '.jpg', '.jpeg')
 IMAGE_EXTS = ('.png', '.jpg', '.jpeg')
 
-DOC_TYPES = ['Contrato', 'Liquidación', 'Anexo de contrato', 'Finiquito']
+# Tipos de documento que puede crear el administrador (nombre corto, que es lo
+# que ve el trabajador en la tarjeta, y descripcion para el menu).
+_DOCS = [
+    ('Contrato de trabajo',
+     'Documento principal que fija las condiciones del empleo (indefinido, '
+     'a plazo fijo o por obra y faena).'),
+    ('Anexo de contrato',
+     'Modificaciones posteriores a las condiciones originales: jornada, '
+     'funciones, lugar de trabajo o remuneración.'),
+    ('Liquidación de sueldo',
+     'Comprobante de pago de remuneraciones: acredita el pago mensual del '
+     'sueldo y las cotizaciones previsionales.'),
+    ('Registro de asistencia',
+     'Libro de horas: control de la hora de entrada, salida y descanso de la '
+     'jornada laboral.'),
+    ('Pacto de horas extra',
+     'Acuerdo específico para la realización y compensación de sobretiempo.'),
+    ('Comprobante de vacaciones',
+     'Solicitud y registro formal del uso de días de descanso legal.'),
+    ('Reglamento interno',
+     'Entrega del Reglamento Interno de Orden, Higiene y Seguridad: '
+     'constancia de que el trabajador lo recibió y conoció.'),
+    ('Protocolo o normativa',
+     'Protocolos y normativas especiales, como prevención del acoso '
+     '(Ley Karin) u otros reglamentos de convivencia.'),
+    ('Capacitación y EPP (ODI)',
+     'Registro de inducción de riesgos laborales y de la recepción de '
+     'elementos de protección personal.'),
+    ('Pacto de modalidad especial',
+     'Acuerdo de trabajo a distancia, teletrabajo o flexibilidad laboral.'),
+    ('Finiquito laboral',
+     'Término de la relación de trabajo: sella el pago de indemnizaciones y '
+     'prestaciones pendientes.'),
+]
+DOC_TYPES = [name for name, _ in _DOCS]
+DOC_DETAILS = dict(_DOCS)
 DOC_TITLE_MIN, DOC_TITLE_MAX = 5, 80
 DOC_MAX_PAGES = 200
 
