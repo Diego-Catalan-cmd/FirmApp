@@ -26,12 +26,21 @@ except Exception:  # Plyer no instalado, o sin backend para este SO
     _notification = None
 
 
+def _recortar(text, limit):
+    text = ' '.join(str(text).split())
+    return text if len(text) <= limit else text[:limit - 1] + '…'
+
+
 def notify(title, message, timeout=6):
     """Muestra una notificacion del sistema operativo. Si falla por
     cualquier motivo, solo lo registra en el log -- no interrumpe la app."""
     if _notification is None:
         Logger.info('Notificaciones: Plyer no disponible, se omite "%s"', title)
         return
+    # El globo de Windows acepta como maximo 63 caracteres de titulo y 255 de
+    # mensaje; un texto mas largo puede hacer fallar la notificacion.
+    title = _recortar(title, 60)
+    message = _recortar(message, 250)
     try:
         _notification.notify(title=title, message=message, timeout=timeout,
                              app_name='FirmApp')

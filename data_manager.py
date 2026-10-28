@@ -151,6 +151,24 @@ class DataManager:
                   'se usan los datos de ejemplo' % exc)
             return list(default_pending), list(default_recent)
 
+    def read_documents(self):
+        """Como load_documents pero estricto: devuelve (pending, recent) solo si
+        el archivo existe y es JSON valido; None si no (por ejemplo, otro
+        proceso lo esta escribiendo justo ahora)."""
+        try:
+            with open(DOCS_FILE, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+            return list(data['pending']), list(data['recent'])
+        except (IOError, OSError, ValueError, KeyError, TypeError):
+            return None
+
+    def documents_mtime(self):
+        """Fecha de modificacion de documentos.json (None si no existe)."""
+        try:
+            return os.path.getmtime(DOCS_FILE)
+        except OSError:
+            return None
+
     def save_documents(self, pending, recent):
         """Guarda el estado actual de PENDING/RECENT. Se llama cada vez
         que se firma un documento (InterfazRRHHApp.complete_signature())."""

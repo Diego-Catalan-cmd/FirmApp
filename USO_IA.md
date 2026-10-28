@@ -435,3 +435,17 @@ Cada valor tiene rango válido; uno inválido se ignora. Probado en headless:
 cambio de cada valor con la app abierta, valores inválidos/fuera de rango,
 flags apagados y encendidos, y la regresión completa a dos tamaños.
 
+### Notificaciones también en el PC
+
+Pedido: que las notificaciones de la app aparezcan en Windows y que llegue un
+aviso al subir un archivo. La IA lo interpretó de dos formas y cubrió ambas:
+(1) elegir/enviar el archivo de una licencia genera notificación del sistema;
+(2) cuando el administrador publica un documento, el trabajador recibe el
+aviso (campana, aviso emergente y notificación del PC) aunque esté en otra
+ventana, gracias a un vigilante de `documentos.json` (`_watch_documents`).
+Además se reflejó en el PC el banner de RR.HH. y las notificaciones sin leer.
+Límite: es una sola máquina (o carpeta compartida), no un servidor; y la IA
+no pudo probar la notificación real de Windows desde su entorno Linux: se
+probó la lógica con las llamadas interceptadas. Los textos se recortan al
+máximo de Windows.
+

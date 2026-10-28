@@ -396,6 +396,37 @@ quiera, no solo en el instante en que llegó:
   `Pressable` (`widgets.py`) ya desconecta su listener de `Window` al
   salir del árbol de widgets.
 
+### Notificaciones del sistema (Windows)
+
+Todo lo que se avisa dentro de la app también se envía como notificación del
+sistema (`notifications.notify()`, Plyer; en Windows usa el globo de la
+bandeja y queda en el Centro de notificaciones):
+
+| Evento | Notificación del PC |
+|---|---|
+| Documento firmado | "Documento firmado" |
+| Iniciar sesión con documentos urgentes | "Tienes documentos urgentes" |
+| Banner de RR.HH. (Remote Config), al iniciar sesión o cuando cambia | "Aviso de RR.HH." |
+| Notificaciones sin leer al iniciar sesión | "Notificaciones sin leer" |
+| Elegir el archivo de una licencia | "Archivo cargado" / "Archivo rechazado" |
+| Enviar solicitud o licencia | "Solicitud enviada" / "Licencia enviada" |
+| Respuesta de RR.HH. a una solicitud | "RR.HH. respondió tu solicitud" |
+| El administrador publica un documento | "Nuevo documento por firmar" (al trabajador) y "Documento publicado" (al admin) |
+
+**Documento nuevo en otra ventana:** `InterfazRRHHApp._watch_documents()`
+revisa cada 3 s si `data/documentos.json` cambió por obra de otra ventana que
+comparta la carpeta `data/`. Si aparecen documentos nuevos, recarga la lista y
+avisa con la campana, el aviso emergente y la notificación del sistema. Para
+verlo: abre dos terminales en la misma carpeta, entra como `admin@firmapp.cl`
+en una y como `demo@firmapp.cl` en otra, y publica un documento. (Las dos
+ventanas deben ser del mismo equipo, o compartir la carpeta `data/`: no hay
+servidor.)
+
+Los textos se recortan a lo que acepta Windows (63 caracteres de título y
+255 de mensaje). Si no aparecen, revisa en Windows *Configuración →
+Sistema → Notificaciones* (que estén activadas y que no esté el modo
+*No molestar* / asistente de concentración).
+
 ## 2. Instalación en Visual Studio Code
 
 1. Instala **Python 3.10 u 11** (en Windows marca *Add Python to PATH*).

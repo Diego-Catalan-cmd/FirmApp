@@ -105,6 +105,8 @@ KINDS = {
                     approved='Su permiso fue aprobado'),
     'licencia': dict(label='Licencia', icon='camera',
                      approved='Su licencia fue validada y aprobada'),
+    # Notificacion (no es una solicitud): el administrador publico un documento.
+    'documento': dict(label='Documento', icon='file', approved=''),
 }
 
 

@@ -34,6 +34,7 @@ Config.set('input', 'mouse', 'mouse,multitouch_on_demand')
 
 import os
 import shutil
+import uuid
 import tempfile
 from datetime import datetime
 
@@ -103,6 +104,7 @@ REMOTE_FLAGS = ('enable_vacations', 'enable_permits', 'enable_licenses')
 
 # Simulacion de la respuesta de RR.HH.: como no hay backend, cada solicitud se
 # 'aprueba' sola despues de estos segundos y genera la notificacion.
+DOCS_WATCH_INTERVAL = 3   # segundos entre cada revision de documentos.json
 REVIEW_DELAY = 10   # valor por defecto; Remote Config lo puede cambiar (review_delay_seconds)
 
 # Interruptor de la demo en vivo: True = lee remote/config.json del disco
@@ -722,6 +724,8 @@ class LicenseScreen(RequestScreen):
         self.file_ok = ok
         self.file_msg = msg
         self.refresh()
+        notifications.notify('Archivo cargado' if ok else 'Archivo rechazado',
+                             ('%s se adjuntó correctamente.' % self.file_name) if ok else msg)
 
     def send(self):
         license_type = self.ids.type_select.selected
@@ -968,6 +972,7 @@ class InterfazRRHHApp(MDApp):
         self.notif_count = len(self.notifications)
         self._review_scheduled = set()
         self._home_texture = None
+        self._docs_mtime = self.dm.documents_mtime()
         self.login_screen = LoginScreen(name='login')
         self.register_screen = RegisterScreen(name='register')
         self.home_screen = HomeScreen(name='home')
@@ -996,6 +1001,8 @@ class InterfazRRHHApp(MDApp):
         # cambia mientras la app sigue abierta, el banner/CTA/limite se
         # actualizan solos, sin reiniciar la app.
         Clock.schedule_interval(self._poll_remote_config, REMOTE_CONFIG_POLL_INTERVAL)
+        # Documentos publicados desde otra ventana/PC que comparta la carpeta data/
+        Clock.schedule_interval(self._watch_documents, DOCS_WATCH_INTERVAL)
 
         self.refresh_balance()
 
@@ -1034,6 +1041,8 @@ class InterfazRRHHApp(MDApp):
             dashboard.banner_text = banner
             if self.notification_overlay:
                 self.notification_overlay.message = banner
+            if banner and self.current_user and self.dm.get_role(self.current_user) != 'admin':
+                notifications.notify('Aviso de RR.HH.', banner)
 
         cta = _coerce_bool(cfg.get('show_desktop_cta'))
         if cta is None:
@@ -1177,7 +1186,10 @@ class InterfazRRHHApp(MDApp):
         self._schedule_reviews()
         label = solicitudes.KINDS[kind]['label']
         resumen = solicitudes.request_title(req)
-        notifications.notify('Solicitud enviada', '%s: %s' % (label, resumen))
+        if kind == 'licencia':
+            notifications.notify('Licencia enviada', '%s quedó en revisión.' % req.get('filename', 'El archivo'))
+        else:
+            notifications.notify('Solicitud enviada', '%s: %s' % (label, resumen))
         self.go_to_request_success(
             '¡Solicitud enviada!',
             'Tu solicitud de %s (%s) quedó en revisión. Te avisaremos apenas '
@@ -1253,7 +1265,7 @@ class InterfazRRHHApp(MDApp):
         if self.notification_overlay:
             self.hide_notifications()
         {'vacaciones': self.go_to_vacations, 'permiso': self.go_to_permit,
-         'licencia': self.go_to_license}[notif['kind']]()
+         'licencia': self.go_to_license, 'documento': self.go_home}[notif['kind']]()
 
     # --------------------------------------------------------- navegacion
     def logout(self):
@@ -1265,17 +1277,58 @@ class InterfazRRHHApp(MDApp):
         self.sm.current = 'login'
 
     # ------------------------------------------- administracion (documentos)
+    def _save_documents(self):
+        """Guarda y recuerda la fecha del archivo, para que _watch_documents no
+        tome el guardado propio como un cambio hecho por otra persona."""
+        self.dm.save_documents(PENDING, RECENT)
+        self._docs_mtime = self.dm.documents_mtime()
+
+    def _watch_documents(self, dt):
+        """Si otra ventana (por ejemplo, el administrador) cambio
+        documentos.json, recarga la lista y avisa de los documentos nuevos:
+        aviso en la app (campana + emergente) y notificacion del sistema."""
+        mtime = self.dm.documents_mtime()
+        if mtime is None or mtime == self._docs_mtime:
+            return
+        data = self.dm.read_documents()
+        if data is None:                      # aun se esta escribiendo: reintenta
+            return
+        self._docs_mtime = mtime
+        pending, recent = data
+        known = {d['title'] for d in PENDING}
+        new_docs = [d for d in pending if d['title'] not in known]
+        PENDING[:] = pending
+        RECENT[:] = recent
+        dashboard = self.home_screen.ids.dashboard
+        dashboard.refresh_pending()
+        dashboard.set_max_recent(dashboard.max_recent)
+        self.admin_screen.refresh_docs()
+        if self.current_user and self.sm.get_screen('admin') is not self.sm.current_screen:
+            for doc in new_docs:
+                self._notify_new_document(doc)
+
+    def _notify_new_document(self, doc):
+        message = 'Nuevo documento por firmar: %s' % doc['title']
+        notif = dict(id='doc-' + uuid.uuid4().hex[:6], kind='documento', message=message)
+        self.notifications.append(notif)
+        self.notif_count = len(self.notifications)
+        self._persist_requests()
+        notifications.notify('Nuevo documento por firmar', doc['title'])
+        self.show_toast(notif)
+        self.refresh_overlay()
+
     def create_document(self, doc_type, title, deadline, pages, urgent):
         """Publica un documento nuevo por firmar (lo crea el admin) y lo
         guarda en JSON; los trabajadores lo ven en 'Tareas Pendientes'."""
         PENDING.append(dict(doc_type=doc_type, title=title, deadline=deadline,
                             urgent=urgent, pages=pages))
-        self.dm.save_documents(PENDING, RECENT)
+        self._save_documents()
+        notifications.notify('Documento publicado', '%s quedó disponible para firma.' % title)
         self.home_screen.ids.dashboard.refresh_pending()
 
     def delete_document(self, title):
         PENDING[:] = [d for d in PENDING if d['title'] != title]
-        self.dm.save_documents(PENDING, RECENT)
+        self._save_documents()
         self.home_screen.ids.dashboard.refresh_pending()
         self.admin_screen.refresh_docs()
         self.admin_screen.success = ''
@@ -1300,6 +1353,12 @@ class InterfazRRHHApp(MDApp):
             return
         self.sm.current = 'home'
         self._schedule_reviews()
+        banner = self.home_screen.ids.dashboard.banner_text
+        if banner:
+            notifications.notify('Aviso de RR.HH.', banner)
+        if self.notifications:
+            notifications.notify('Notificaciones sin leer',
+                                 'Tienes %d notificación(es) sin leer en la campana.' % len(self.notifications))
         # Notificaciones (Plyer): si al entrar ya hay un documento urgente,
         # se avisa una vez al sistema operativo -- el mismo lugar donde
         # iria una notificacion push real si el proyecto tuviera backend.
@@ -1344,7 +1403,7 @@ class InterfazRRHHApp(MDApp):
             filesize='—',
             offline=True,
         ))
-        self.dm.save_documents(PENDING, RECENT)
+        self._save_documents()
         dashboard = self.home_screen.ids.dashboard
         dashboard.refresh_pending()
         dashboard.set_max_recent(dashboard.max_recent)
