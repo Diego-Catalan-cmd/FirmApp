@@ -33,6 +33,7 @@ DATA_DIR = os.path.join(_HERE, 'data')
 USERS_FILE = os.path.join(DATA_DIR, 'usuarios.json')
 DOCS_FILE = os.path.join(DATA_DIR, 'documentos.json')
 REQUESTS_FILE = os.path.join(DATA_DIR, 'solicitudes.json')
+ADMIN_ID = 'admin@firmapp.cl'
 
 
 def _hash_password(password):
@@ -66,14 +67,21 @@ class DataManager:
             os.makedirs(DATA_DIR, exist_ok=True)
         except OSError as exc:
             print('DataManager: no se pudo crear la carpeta data/ (%s)' % exc)
-        if not os.path.exists(USERS_FILE):
-            # Cuenta de demostracion precargada, para poder iniciar sesion
-            # la primera vez sin tener que registrarse antes -- el "Plan B
-            # Tecnico" de la Sesion 24 recomienda tener datos de respaldo
-            # listos para la demo en vivo.
-            self._save_users({
-                'demo@firmapp.cl': {'password_hash': _hash_password('demo1234')},
-            })
+        # Cuentas precargadas, para poder iniciar sesion sin registrarse antes
+        # (el "Plan B Tecnico" de la Sesion 24 recomienda tener datos de
+        # respaldo listos para la demo): un trabajador de prueba y la cuenta
+        # de ADMINISTRADOR que crea los documentos por firmar. Se agregan solo
+        # si faltan, asi tambien aparecen en un usuarios.json ya existente.
+        users = self.load_users()
+        seeded = False
+        for key, password, role in (
+                ('demo@firmapp.cl', 'demo1234', 'trabajador'),
+                (ADMIN_ID, 'admin1234', 'admin')):
+            if key not in users:
+                users[key] = {'password_hash': _hash_password(password), 'role': role}
+                seeded = True
+        if seeded:
+            self._save_users(users)
 
     # =============================================================== USUARIOS
     def load_users(self):
@@ -105,7 +113,7 @@ class DataManager:
         users = self.load_users()
         if key in users:
             return False, 'Ya existe una cuenta con ese RUT o correo.'
-        users[key] = {'password_hash': _hash_password(password)}
+        users[key] = {'password_hash': _hash_password(password), 'role': 'trabajador'}
         if not self._save_users(users):
             return False, 'No se pudo guardar la cuenta (error de disco).'
         return True, 'Cuenta creada correctamente.'
@@ -118,6 +126,12 @@ class DataManager:
         if not user:
             return False
         return user.get('password_hash') == _hash_password(password)
+
+    def get_role(self, identifier):
+        """'admin' o 'trabajador' (las cuentas registradas desde la app son
+        siempre 'trabajador': solo se puede ser admin editando usuarios.json)."""
+        user = self.load_users().get(_normalize_key(identifier), {})
+        return user.get('role', 'trabajador')
 
     # ============================================================= DOCUMENTOS
     def load_documents(self, default_pending, default_recent):

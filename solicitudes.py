@@ -33,6 +33,10 @@ LICENSE_MIN_SIDE = 400                 # px: una foto legible de un documento
 LICENSE_EXTS = ('.pdf', '.png', '.jpg', '.jpeg')
 IMAGE_EXTS = ('.png', '.jpg', '.jpeg')
 
+DOC_TYPES = ['Contrato', 'Liquidación', 'Anexo de contrato', 'Finiquito']
+DOC_TITLE_MIN, DOC_TITLE_MAX = 5, 80
+DOC_MAX_PAGES = 200
+
 MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun',
          'jul', 'ago', 'sep', 'oct', 'nov', 'dic']
 MESES_LARGO = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio',
@@ -168,6 +172,33 @@ def validate_license_file(path, from_camera=False, image_size=None):
             return False, ('La imagen es muy pequeña para leerse. '
                            'Toma la foto más de cerca.')
     return True, 'Documento válido: formato, peso y legibilidad correctos.'
+
+
+def fmt_deadline(d):
+    """'20 Nov 2026': el mismo formato de los documentos de ejemplo."""
+    return '%02d %s %d' % (d.day, MESES[d.month - 1].capitalize(), d.year)
+
+
+def validate_document(doc_type, title, deadline, pages_text, existing_titles, today=None):
+    """(ok, mensaje). Reglas del panel de administracion al crear un
+    documento por firmar: tipo elegido, titulo unico de 5 a 80 caracteres,
+    fecha limite desde hoy y entre 1 y 200 paginas. El titulo debe ser unico
+    porque identifica al documento al firmarlo (complete_signature)."""
+    today = today or date.today()
+    title = (title or '').strip()
+    if not doc_type:
+        return False, 'Elige el tipo de documento.'
+    if not (DOC_TITLE_MIN <= len(title) <= DOC_TITLE_MAX):
+        return False, 'El título debe tener entre %d y %d caracteres.' % (DOC_TITLE_MIN, DOC_TITLE_MAX)
+    if title.lower() in (t.lower() for t in existing_titles):
+        return False, 'Ya existe un documento con ese título.'
+    if not deadline:
+        return False, 'Elige la fecha límite en el calendario.'
+    if deadline < today:
+        return False, 'La fecha límite no puede ser anterior a hoy.'
+    if not (pages_text or '').strip().isdigit() or not (1 <= int(pages_text) <= DOC_MAX_PAGES):
+        return False, 'Las páginas deben ser un número entre 1 y %d.' % DOC_MAX_PAGES
+    return True, ''
 
 
 # ----------------------------------------------------------------- registros

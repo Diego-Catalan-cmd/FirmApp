@@ -386,3 +386,16 @@ vacaciones fueron aprobadas") que, al tocarla, abra su sección y se quite.
   del calendario, validación de archivos buenos y malos, aprobación,
   notificación, apertura y eliminación, y persistencia tras cerrar y
   reabrir (las respuestas pendientes se retoman).
+
+### Panel de administración: crear documentos para firmar
+
+Pregunta del estudiante: ¿cómo se crean los documentos que los usuarios
+firman? (idealmente con una cuenta específica o un panel de admin). La IA
+respondió implementándolo: cuenta `admin@firmapp.cl` con rol `admin`
+(`data_manager.get_role`), `AdminScreen` con formulario validado
+(`solicitudes.validate_document`), cierre de sesión (`logout`) y
+persistencia en `data/documentos.json`. Decisión de la IA, cambiable: los
+documentos son globales (para todos los trabajadores), no por usuario.
+Probado en headless: login admin, creación, título duplicado rechazado,
+persistencia, ver el documento como trabajador, retirarlo.
+

@@ -42,7 +42,7 @@ from kivymd.uix.widget import MDWidget
 import theme as T
 from icons import ICONS, STROKE
 from validators import identify
-from solicitudes import MESES_LARGO, fmt_range, plural_days, count_days
+from solicitudes import MESES_LARGO, fmt_day, fmt_range, plural_days, count_days
 
 
 # ============================================================== TEXTURAS
@@ -784,6 +784,7 @@ class CalendarPicker(MDBoxLayout):
     summary = StringProperty('')
     complete = BooleanProperty(False)
     can_prev = BooleanProperty(False)
+    single = BooleanProperty(False)     # True = un solo dia (fecha limite)
 
     def on_kv_post(self, base_widget):
         self._today = date.today()
@@ -800,7 +801,9 @@ class CalendarPicker(MDBoxLayout):
     def pick(self, d):
         if d < self._today:
             return
-        if self.start is None or self.end is not None:
+        if self.single:
+            self.start = self.end = d
+        elif self.start is None or self.end is not None:
             self.start, self.end = d, None
         elif d < self.start:
             self.start = d
@@ -860,11 +863,15 @@ class CalendarPicker(MDBoxLayout):
             else:
                 cell.day, cell.text, cell.state = None, '', 'empty'
         self.complete = bool(self.start and self.end)
-        if self.complete:
+        if self.complete and self.single:
+            self.summary = 'Fecha límite: %s' % fmt_day(self.start)
+        elif self.complete:
             self.summary = '%s · %s' % (fmt_range(self.start, self.end),
                                         plural_days(count_days(self.start, self.end)))
         elif self.start:
             self.summary = 'Ahora toca el último día (o el mismo si es uno solo)'
+        elif self.single:
+            self.summary = 'Toca el día límite'
         else:
             self.summary = 'Toca el primer día'
 
@@ -997,3 +1004,23 @@ class NotificationToast(PressCard):
 
     def on_touch_up(self, touch):
         return self.shown and super().on_touch_up(touch)
+
+
+class FormField(MDBoxLayout):
+    """Campo de texto de una linea con el borde del diseno (panel de admin)."""
+    hint = StringProperty('')
+    text = StringProperty('')
+    max_chars = NumericProperty(80)
+    input_filter = ObjectProperty(None, allownone=True)
+
+    def clear(self):
+        self.ids.field.text = ''
+
+
+class AdminDocRow(MDBoxLayout):
+    """Fila de 'Documentos publicados' del panel de administracion."""
+    title = StringProperty('')
+    detail = StringProperty('')
+    doc_type = StringProperty('')
+    urgent = BooleanProperty(False)
+    last = BooleanProperty(False)

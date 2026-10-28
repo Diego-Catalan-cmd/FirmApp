@@ -55,7 +55,8 @@ from kivymd.uix.floatlayout import MDFloatLayout
 
 import theme as T
 from widgets import (GlassCard, MeshBackground, Pressable, PressCard,
-                     SnapshotBackground, RequestRow, NotificationRow)
+                     SnapshotBackground, RequestRow, NotificationRow,
+                     AdminDocRow)
 import solicitudes
 import remote_config
 import notifications
@@ -400,13 +401,21 @@ class LoginScreen(Screen):
         ok = getattr(self, '_id_valid', False) and getattr(self, '_password_ok', False)
         self.ids.cta.set_enabled(ok)
 
+    def reset(self):
+        """Limpia el formulario (al cerrar sesion no debe quedar la clave)."""
+        self.ids.identifier.text = ''
+        self.ids.password.text = ''
+        self.ids.auth_feedback.text = ''
+        self._id_valid = self._password_ok = False
+        self._refresh_cta()
+
     def login(self):
         app = MDApp.get_running_app()
         identifier = self.ids.identifier.text
         password = self.ids.password.text
         if app.dm.authenticate(identifier, password):
             self.ids.auth_feedback.text = ''
-            app.go_to_home_after_login()
+            app.go_to_home_after_login(identifier)
         else:
             self.ids.auth_feedback.text = (
                 'RUT/correo o contraseña incorrectos. '
@@ -463,7 +472,7 @@ class RegisterScreen(Screen):
         self.ids.feedback.text_color = (T.C_PRIMARY if ok else
                                         T.rgba(T.ORANGE, .95))
         if ok:
-            app.go_to_home_after_login()
+            app.go_to_home_after_login(identifier)
 
     def reset(self):
         """Limpia el formulario al entrar (para no dejar datos de una
@@ -695,6 +704,73 @@ class LicenseScreen(RequestScreen):
             source=self.source, file_path=self.file_path)
 
 
+class AdminScreen(Screen):
+    """
+    Panel de administracion: solo entra la cuenta con rol 'admin'
+    (data_manager.get_role). Desde aqui se CREAN los documentos que los
+    trabajadores ven en 'Tareas Pendientes' y firman, y se pueden retirar.
+    Los documentos se guardan en JSON (data/documentos.json), igual que los
+    firmados, y las reglas de validacion estan en solicitudes.validate_document().
+    """
+    urgent = BooleanProperty(False)
+    error = StringProperty('')
+    success = StringProperty('')
+    has_docs = BooleanProperty(False)
+    docs_count = NumericProperty(0)
+
+    def on_kv_post(self, base_widget):
+        self.ids.cta.set_enabled(False)
+
+    def reset(self):
+        self.ids.type_select.reset()
+        self.ids.title_in.clear()
+        self.ids.pages_in.clear()
+        self.ids.calendar.clear()
+        self.urgent = False
+        self.error = ''
+        self.refresh()
+        self.refresh_docs()
+
+    def toggle_urgent(self):
+        self.urgent = not self.urgent
+
+    def _values(self):
+        return (self.ids.type_select.selected, self.ids.title_in.text,
+                self.ids.calendar.start, self.ids.pages_in.text)
+
+    def refresh(self):
+        doc_type, title, deadline, pages = self._values()
+        ok, msg = solicitudes.validate_document(
+            doc_type, title, deadline, pages, [d['title'] for d in PENDING])
+        filled = bool(doc_type and title.strip() and deadline and pages.strip())
+        self.error = '' if (ok or not filled) else msg
+        self.ids.cta.set_enabled(ok)
+
+    def create(self):
+        doc_type, title, deadline, pages = self._values()
+        ok, msg = solicitudes.validate_document(
+            doc_type, title, deadline, pages, [d['title'] for d in PENDING])
+        if not ok:
+            self.error = msg
+            return
+        MDApp.get_running_app().create_document(
+            doc_type, title.strip(), solicitudes.fmt_deadline(deadline),
+            int(pages), self.urgent)
+        self.reset()
+        self.success = 'Documento "%s" publicado: ya aparece a los trabajadores.' % title.strip()
+
+    def refresh_docs(self):
+        box = self.ids.docs_box
+        box.clear_widgets()
+        for i, d in enumerate(PENDING):
+            box.add_widget(AdminDocRow(
+                title=d['title'], doc_type=d['doc_type'], urgent=d.get('urgent', False),
+                detail='%s · Vence: %s · %s pág.' % (d['doc_type'], d['deadline'], d['pages']),
+                last=(i == len(PENDING) - 1)))
+        self.docs_count = len(PENDING)
+        self.has_docs = bool(PENDING)
+
+
 class HomeScreen(Screen):
     """Pantalla 'Inicio': envuelve el tablero (RootScreen) sin logica propia."""
     pass
@@ -821,6 +897,7 @@ class InterfazRRHHApp(MDApp):
     """
     title = 'Interfaz de Recursos Humanos'
     notif_count = NumericProperty(0)    # notificaciones de solicitudes sin leer
+    current_user = StringProperty('')   # identificador de la sesion ('' = sin sesion)
 
     def build(self):
         # Tema Material ajustado a la paleta del diseno de Figma.
@@ -861,10 +938,11 @@ class InterfazRRHHApp(MDApp):
         self.vacation_screen = VacationScreen(name='vacation')
         self.permit_screen = PermitScreen(name='permit')
         self.license_screen = LicenseScreen(name='license')
+        self.admin_screen = AdminScreen(name='admin')
         for screen in (self.login_screen, self.register_screen,
                        self.home_screen, self.sign_screen, self.success_screen,
                        self.vacation_screen, self.permit_screen,
-                       self.license_screen):
+                       self.license_screen, self.admin_screen):
             self.sm.add_widget(screen)
         self.notification_overlay = None
         self._remote_applied = {}   # ultimo valor remoto ya aplicado (evita repintar sin cambios)
@@ -1067,7 +1145,8 @@ class InterfazRRHHApp(MDApp):
         self.notif_count = len(self.notifications)
         self._persist_requests()
         notifications.notify('RR.HH. respondió tu solicitud', notif['message'])
-        self.show_toast(notif)
+        if self.current_user and self.sm.current != 'admin':
+            self.show_toast(notif)
         self.refresh_overlay()
         current = self.sm.get_screen(self.sm.current)
         if isinstance(current, RequestScreen):
@@ -1107,6 +1186,30 @@ class InterfazRRHHApp(MDApp):
          'licencia': self.go_to_license}[notif['kind']]()
 
     # --------------------------------------------------------- navegacion
+    def logout(self):
+        """Cierra la sesion y vuelve al Login (limpiando el formulario)."""
+        self.current_user = ''
+        self.hide_notifications()
+        self._hide_toast()
+        self.login_screen.reset()
+        self.sm.current = 'login'
+
+    # ------------------------------------------- administracion (documentos)
+    def create_document(self, doc_type, title, deadline, pages, urgent):
+        """Publica un documento nuevo por firmar (lo crea el admin) y lo
+        guarda en JSON; los trabajadores lo ven en 'Tareas Pendientes'."""
+        PENDING.append(dict(doc_type=doc_type, title=title, deadline=deadline,
+                            urgent=urgent, pages=pages))
+        self.dm.save_documents(PENDING, RECENT)
+        self.home_screen.ids.dashboard.refresh_pending()
+
+    def delete_document(self, title):
+        PENDING[:] = [d for d in PENDING if d['title'] != title]
+        self.dm.save_documents(PENDING, RECENT)
+        self.home_screen.ids.dashboard.refresh_pending()
+        self.admin_screen.refresh_docs()
+        self.admin_screen.success = ''
+
     def go_to_register(self):
         """Login -> Registro."""
         self.register_screen.reset()
@@ -1116,10 +1219,15 @@ class InterfazRRHHApp(MDApp):
         """Registro -> Login (volver sin crear cuenta)."""
         self.sm.current = 'login'
 
-    def go_to_home_after_login(self):
-        """Login o Registro -> Inicio. Llamado por LoginScreen.login() y
-        por RegisterScreen.register() cuando la cuenta se crea con exito
-        (registro + login combinados, ver RegisterScreen)."""
+    def go_to_home_after_login(self, identifier=''):
+        """Login o Registro -> Inicio (o al panel, si la cuenta es admin).
+        Llamado por LoginScreen.login() y por RegisterScreen.register() cuando
+        la cuenta se crea con exito (registro + login combinados)."""
+        self.current_user = identifier
+        if self.dm.get_role(identifier) == 'admin':
+            self.admin_screen.reset()
+            self.sm.current = 'admin'
+            return
         self.sm.current = 'home'
         self._schedule_reviews()
         # Notificaciones (Plyer): si al entrar ya hay un documento urgente,
@@ -1208,11 +1316,11 @@ for _cls in (_w.GlassCard, _w.DashedPanel, _w.PressCard, _w.GradientTile,
              _w.LoginIdentifierInput, _w.PasswordInput, _w.ScreenHeader, _w.Chip,
              _w.DayCell, _w.CalendarPicker, _w.ReasonInput, _w.ReasonCard,
              _w.OptionRow, _w.DropdownField, _w.SourceTile, _w.RequestRow,
-             _w.NotificationRow, _w.NotificationToast,
+             _w.NotificationRow, _w.NotificationToast, _w.FormField, _w.AdminDocRow,
              StatCard, QuickActionCard, SectionLabel, HeaderCard,
              PendingCard, DocRow, FooterCard, DesktopCtaCard,
              SignPanel, LoginScreen, RegisterScreen, HomeScreen, SignScreen, SuccessScreen,
-             VacationScreen, PermitScreen, LicenseScreen, FilePickerPopup,
+             VacationScreen, PermitScreen, LicenseScreen, AdminScreen, FilePickerPopup,
              RootScreen, NotificationOverlay):
     Factory.register(_cls.__name__, cls=_cls)
 

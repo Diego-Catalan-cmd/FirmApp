@@ -65,9 +65,9 @@ abajo.
 ```
 FirmApp/
 ├── main.py                    <- SOLO clases y lógica (hereda de MDApp)
-│                                  ScreenManager + 8 pantallas: Login, Registro,
+│                                  ScreenManager + 9 pantallas: Login, Registro,
 │                                  Inicio, Firmar, Éxito, Vacaciones, Permiso,
-│                                  Licencia
+│                                  Licencia, Administración
 ├── interfazrrhh.kv            <- TODO el diseño visual (componentes KivyMD)
 ├── widgets.py                 <- Clases base sobre MDBoxLayout / MDCard / MDTextField
 ├── validators.py              <- Validación de RUT (dígito verificador) y correo
@@ -95,7 +95,7 @@ FirmApp/
 ## Navegación (ScreenManager)
 
 La maqueta original no tenía `ScreenManager`: era una sola pantalla con un
-modal superpuesto. Se reestructuró a 8 pantallas navegables, tal como exige
+modal superpuesto. Se reestructuró a 9 pantallas navegables, tal como exige
 la evaluación:
 
 0. **`login`** (`LoginScreen`) — primera pantalla: RUT o correo + contraseña,
@@ -112,7 +112,10 @@ la evaluación:
    "Solicitudes de RR.HH." más abajo), a las que se llega desde las tarjetas
    de Acciones Rápidas o desde una notificación.
 
-`InterfazRRHHApp.build()` crea las 8 pantallas una sola vez dentro de un
+8. **`admin`** (`AdminScreen`) — panel de administración (solo la cuenta
+   admin, ver "Panel de administración").
+
+`InterfazRRHHApp.build()` crea las 9 pantallas una sola vez dentro de un
 `ScreenManager` (arranca en `login`) y la navegación
 (`go_to_register`, `go_to_login`, `go_to_home_after_login`, `go_to_sign`,
 `go_to_success`, `go_to_vacations`, `go_to_permit`, `go_to_license`,
@@ -242,6 +245,38 @@ Al **tocar** el aviso emergente o la fila de la lista se abre la sección
 correspondiente y la notificación **se elimina**
 (`InterfazRRHHApp.open_notification()`). Las respuestas pendientes
 sobreviven a cerrar la app: al volver a iniciar sesión se retoman.
+
+## Panel de administración (crear documentos para firmar)
+
+Los documentos que los trabajadores firman los **crea una cuenta
+administradora**, que al iniciar sesión entra directo al panel (`admin`,
+`AdminScreen`) en vez de al Inicio:
+
+| Cuenta | Usuario | Contraseña | Entra a |
+|---|---|---|---|
+| Administrador | `admin@firmapp.cl` | `admin1234` | Panel de administración |
+| Trabajador de prueba | `demo@firmapp.cl` | `demo1234` | Inicio (tablero) |
+
+Ambas se crean solas la primera vez (`DataManager.__init__`). Las cuentas
+que se registran desde la app son siempre **trabajador**: ser admin solo se
+logra con el campo `"role": "admin"` en `data/usuarios.json`
+(`DataManager.get_role()`).
+
+**Cómo crear un documento:** iniciar sesión como admin → elegir el tipo
+(Contrato, Liquidación, Anexo, Finiquito) → título → páginas → fecha límite en
+el calendario → opcionalmente *urgente* → **Publicar documento**. Reglas
+(`solicitudes.validate_document()`): título único de 5 a 80 caracteres, fecha
+desde hoy, 1 a 200 páginas. El documento se guarda en `data/documentos.json`
+y aparece en *Tareas Pendientes* de los trabajadores (los urgentes además
+disparan la notificación al iniciar sesión). El panel también lista los
+documentos pendientes y permite retirarlos (papelera).
+
+**Cerrar sesión:** botón *Salir* en el panel y *Cerrar sesión* al final del
+Inicio (`InterfazRRHHApp.logout()`); sirve para cambiar de cuenta.
+
+> Alcance: los documentos son **para todos los trabajadores** (la app no
+> separa los datos por usuario). Asignar un documento a una persona concreta
+> requeriría guardar pendientes y firmados por cuenta.
 
 ## Remote Config
 
