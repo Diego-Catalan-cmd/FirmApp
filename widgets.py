@@ -985,3 +985,15 @@ class NotificationToast(PressCard):
     notif_id = StringProperty('')
     icon_name = StringProperty('check')
     text = StringProperty('')
+    shown = BooleanProperty(False)
+
+    # Vive siempre encima de todas las pantallas; oculto no debe absorber
+    # toques (antes, con disabled=True, tapaba el boton de volver).
+    def on_touch_down(self, touch):
+        return self.shown and super().on_touch_down(touch)
+
+    def on_touch_move(self, touch):
+        return self.shown and super().on_touch_move(touch)
+
+    def on_touch_up(self, touch):
+        return self.shown and super().on_touch_up(touch)

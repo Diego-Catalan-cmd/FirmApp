@@ -1079,7 +1079,7 @@ class InterfazRRHHApp(MDApp):
         toast.text = notif['message']
         toast.icon_name = solicitudes.KINDS[notif['kind']]['icon']
         Animation.cancel_all(toast)
-        toast.disabled = False
+        toast.shown = True
         Animation(opacity=1, d=0.25, t='out_quad').start(toast)
         Clock.unschedule(self._hide_toast)
         Clock.schedule_once(self._hide_toast, 7)
@@ -1087,7 +1087,7 @@ class InterfazRRHHApp(MDApp):
     def _hide_toast(self, dt=0):
         toast = self.toast
         Animation.cancel_all(toast)
-        toast.disabled = True
+        toast.shown = False
         Animation(opacity=0, d=0.25, t='in_quad').start(toast)
 
     def open_notification(self, notif_id):
