@@ -35,6 +35,15 @@ DEFAULTS = {
     'show_desktop_cta': False,
     # Limite numerico: cuantas "Liquidaciones Recientes" se listan.
     'max_recent_docs': 4,
+    # Politicas y limites de las funciones de RR.HH. (editables sin tocar la app):
+    'vacation_balance': 12,       # dias de vacaciones disponibles por trabajador
+    'permit_max_days': 3,         # maximo de dias de un permiso (1 a 5)
+    'min_password_length': 4,     # largo minimo de la contrasena al REGISTRARSE
+    'review_delay_seconds': 10,   # segundos que tarda RR.HH. en responder (simulado)
+    # Feature flags: apagan una accion rapida sin reinstalar la app.
+    'enable_vacations': True,
+    'enable_permits': True,
+    'enable_licenses': True,
 }
 
 

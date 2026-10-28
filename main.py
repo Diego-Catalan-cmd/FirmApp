@@ -92,9 +92,18 @@ REMOTE_CONFIG_URL = ('https://raw.githubusercontent.com/zikness/FirmApp/'
                       'main/remote/config.json')
 REMOTE_CONFIG_POLL_INTERVAL = 5  # segundos entre cada re-consulta
 
+# Politicas que acepta Remote Config: clave -> (propiedad de la app, minimo, maximo).
+REMOTE_INT_SETTINGS = {
+    'vacation_balance': ('vacation_balance', 0, 60),
+    'permit_max_days': ('permit_max_days', 1, 5),
+    'min_password_length': ('min_password_length', 4, 20),
+    'review_delay_seconds': ('review_delay', 1, 120),
+}
+REMOTE_FLAGS = ('enable_vacations', 'enable_permits', 'enable_licenses')
+
 # Simulacion de la respuesta de RR.HH.: como no hay backend, cada solicitud se
 # 'aprueba' sola despues de estos segundos y genera la notificacion.
-REVIEW_DELAY = 10
+REVIEW_DELAY = 10   # valor por defecto; Remote Config lo puede cambiar (review_delay_seconds)
 
 # Interruptor de la demo en vivo: True = lee remote/config.json del disco
 # (editas, guardas, y en <=5 s cambia la app, sin push ni CDN); False =
@@ -138,15 +147,19 @@ def _coerce_bool(value):
     return None
 
 
-def _coerce_int(value):
-    """Entero >= 0 si 'value' es un numero o un texto numerico; None si no."""
+def _coerce_int(value, lo=0, hi=None):
+    """Entero dentro de [lo, hi] si 'value' es un numero o un texto numerico;
+    None si no lo es o si cae fuera del rango (se ignora y queda el anterior)."""
     if isinstance(value, bool):
         return None
     if isinstance(value, (int, float)) or (isinstance(value, str) and value.strip().lstrip('-').isdigit()):
         try:
-            return max(0, int(value))
+            number = int(value)
         except (ValueError, OverflowError):
             return None
+        if number < lo or (hi is not None and number > hi):
+            return None
+        return number
     return None
 
 
@@ -443,15 +456,27 @@ class RegisterScreen(Screen):
         self._refresh_cta()
 
     def set_password_filled(self, text):
-        self._password_ok = len(text) >= 4
+        # Politica de contrasena: el minimo viene de Remote Config
+        # (min_password_length) y solo rige al REGISTRARSE; el login no lo
+        # exige para no dejar afuera cuentas creadas con una politica anterior.
+        self._password_ok = len(text) >= int(MDApp.get_running_app().min_password_length)
         self._check_confirm()
-        self.ids.feedback.text = ''
+        self._show_password_hint()
         self._refresh_cta()
 
     def set_confirm_filled(self, text):
         self._check_confirm()
-        self.ids.feedback.text = ''
+        self._show_password_hint()
         self._refresh_cta()
+
+    def _show_password_hint(self):
+        """Limpia el mensaje y, si la contrasena es muy corta, explica el minimo."""
+        fb = self.ids.feedback
+        fb.text = ''
+        if self.ids.password.text and not self._password_ok:
+            fb.text = ('La contraseña debe tener al menos %d caracteres.'
+                       % int(MDApp.get_running_app().min_password_length))
+            fb.text_color = T.rgba(T.ORANGE, .95)
 
     def _check_confirm(self):
         self._confirm_ok = (self.ids.password.text != '' and
@@ -553,7 +578,6 @@ class PermitScreen(RequestScreen):
     error = StringProperty('')
 
     def on_kv_post(self, base_widget):
-        self.ids.calendar.max_days = solicitudes.PERMIT_MAX_DAYS
         self.ids.cta.set_enabled(False)
 
     def reset(self):
@@ -567,14 +591,18 @@ class PermitScreen(RequestScreen):
 
     def refresh(self):
         cal = self.ids.calendar
-        ok, msg = solicitudes.validate_permit(cal.start, cal.end, self.ids.reason.text)
+        ok, msg = solicitudes.validate_permit(
+            cal.start, cal.end, self.ids.reason.text,
+            max_days=int(MDApp.get_running_app().permit_max_days))
         self.error = msg if (cal.complete and msg) else ''
         self.ids.cta.set_enabled(ok)
 
     def send(self):
         cal = self.ids.calendar
         reason = self.ids.reason.text.strip()
-        ok, msg = solicitudes.validate_permit(cal.start, cal.end, reason)
+        ok, msg = solicitudes.validate_permit(
+            cal.start, cal.end, reason,
+            max_days=int(MDApp.get_running_app().permit_max_days))
         if not ok:
             self.error = msg
             return
@@ -806,7 +834,7 @@ class RootScreen(MeshBackground):
     banner_text = StringProperty('')   # vacio = el banner no se muestra
     pending_count = NumericProperty(0)  # cuantos PENDING hay (badge + stat)
     max_recent = NumericProperty(0)    # ultimo limite aplicado (local o remoto)
-    vacation_days = NumericProperty(solicitudes.VACATION_BALANCE)  # saldo de vacaciones
+    vacation_days = NumericProperty(solicitudes.VACATION_BALANCE)  # saldo de vacaciones (se actualiza al arrancar)
 
     def on_kv_post(self, base_widget):
         self.refresh_pending()
@@ -899,6 +927,15 @@ class InterfazRRHHApp(MDApp):
     title = 'Interfaz de Recursos Humanos'
     notif_count = NumericProperty(0)    # notificaciones de solicitudes sin leer
     current_user = StringProperty('')   # identificador de la sesion ('' = sin sesion)
+    # Parametros que gobierna Remote Config (ver _apply_remote_config); los
+    # valores iniciales son el Default Local.
+    vacation_balance = NumericProperty(solicitudes.VACATION_BALANCE)
+    permit_max_days = NumericProperty(solicitudes.PERMIT_MAX_DAYS)
+    min_password_length = NumericProperty(4)
+    review_delay = NumericProperty(REVIEW_DELAY)
+    enable_vacations = BooleanProperty(True)
+    enable_permits = BooleanProperty(True)
+    enable_licenses = BooleanProperty(True)
 
     def build(self):
         # Tema Material ajustado a la paleta del diseno de Figma.
@@ -1006,13 +1043,45 @@ class InterfazRRHHApp(MDApp):
             applied['show_desktop_cta'] = cta
             dashboard.set_desktop_cta_visible(cta)
 
-        max_recent = _coerce_int(cfg.get('max_recent_docs'))
+        max_recent = _coerce_int(cfg.get('max_recent_docs'), 0, 50)
         if max_recent is None:
             Logger.warning('RemoteConfig: max_recent_docs invalido (%r) -- se ignora',
                            cfg.get('max_recent_docs'))
         elif applied.get('max_recent_docs') != max_recent:
             applied['max_recent_docs'] = max_recent
             dashboard.set_max_recent(max_recent)
+
+        # Politicas numericas: clave remota -> (propiedad de la app, minimo, maximo).
+        balance_changed = False
+        for key, (attr, lo, hi) in REMOTE_INT_SETTINGS.items():
+            value = _coerce_int(cfg.get(key), lo, hi)
+            if value is None:
+                Logger.warning('RemoteConfig: %s invalido (%r, rango %d-%d) -- se ignora',
+                               key, cfg.get(key), lo, hi)
+            elif applied.get(key) != value:
+                applied[key] = value
+                setattr(self, attr, value)
+                balance_changed = balance_changed or key == 'vacation_balance'
+        if balance_changed:
+            self._on_balance_changed()
+
+        # Feature flags: encienden/apagan una accion rapida.
+        for key in REMOTE_FLAGS:
+            value = _coerce_bool(cfg.get(key))
+            if value is None:
+                Logger.warning('RemoteConfig: %s invalido (%r) -- se ignora', key, cfg.get(key))
+            elif applied.get(key) != value:
+                applied[key] = value
+                setattr(self, key, value)
+
+    def _on_balance_changed(self):
+        """Cambio remoto del saldo de vacaciones: actualiza el Inicio y, si la
+        pantalla de Vacaciones esta abierta, su calendario y su tope."""
+        self.refresh_balance()
+        screen = self.vacation_screen
+        screen.available = self.vacation_available()
+        screen.ids.calendar.max_days = max(1, screen.available)
+        screen.refresh()
 
     # ---------------------------------------------------- notificaciones
     def show_notifications(self):
@@ -1061,7 +1130,7 @@ class InterfazRRHHApp(MDApp):
         """Saldo de vacaciones: lo que no se ha pedido todavia (pendiente o
         aprobado)."""
         used = sum(r.get('days', 0) for r in self.requests if r['kind'] == 'vacaciones')
-        return max(0, solicitudes.VACATION_BALANCE - used)
+        return max(0, int(self.vacation_balance) - used)
 
     def refresh_balance(self):
         self.home_screen.ids.dashboard.vacation_days = self.vacation_available()
@@ -1132,7 +1201,7 @@ class InterfazRRHHApp(MDApp):
         for req in self.requests:
             if req['status'] == 'pendiente' and req['id'] not in self._review_scheduled:
                 self._review_scheduled.add(req['id'])
-                Clock.schedule_once(lambda dt, rid=req['id']: self._approve(rid), REVIEW_DELAY)
+                Clock.schedule_once(lambda dt, rid=req['id']: self._approve(rid), self.review_delay)
 
     def _approve(self, req_id):
         """Respuesta simulada de RR.HH.: aprueba la solicitud y genera la

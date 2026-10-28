@@ -1497,21 +1497,27 @@
                         QuickActionCard:
                             icon_name: 'vacation'
                             label_text: 'Pedir Vacaciones'
-                            sub_text: 'Solicita días libres'
+                            sub_text: 'Solicita días libres' if app.enable_vacations else 'No disponible por ahora'
+                            disabled: not app.enable_vacations
+                            opacity: 1 if app.enable_vacations else .45
                             c1: T.C_PRIMARY
                             c2: T.C_PRIMARY_DARK
                             on_release: app.go_to_vacations()
                         QuickActionCard:
                             icon_name: 'permit'
                             label_text: 'Solicitar Permiso'
-                            sub_text: 'Permiso administrativo'
+                            sub_text: 'Permiso administrativo' if app.enable_permits else 'No disponible por ahora'
+                            disabled: not app.enable_permits
+                            opacity: 1 if app.enable_permits else .45
                             c1: T.C_PRIMARY_LIGHT
                             c2: T.C_PRIMARY
                             on_release: app.go_to_permit()
                         QuickActionCard:
                             icon_name: 'camera'
                             label_text: 'Subir Licencia'
-                            sub_text: 'Foto o PDF médico'
+                            sub_text: 'Foto o PDF médico' if app.enable_licenses else 'No disponible por ahora'
+                            disabled: not app.enable_licenses
+                            opacity: 1 if app.enable_licenses else .45
                             c1: T.C_SECONDARY
                             c2: T.C_PRIMARY_LIGHT
                             on_release: app.go_to_license()
@@ -2326,11 +2332,11 @@
                                     size: dp(20), dp(20)
                                     pos_hint: {'top': 1}
                                 Txt:
-                                    text: 'Solo para emergencias o fuerza mayor (salud, familia, siniestros). Son de 1 a 3 días; para un descanso planificado usa Pedir Vacaciones.'
+                                    text: 'Solo para emergencias o fuerza mayor (salud, familia, siniestros). Son de 1 a %d días; para un descanso planificado usa Pedir Vacaciones.' % app.permit_max_days
                                     font_size: sp(10.5)
                                     text_color: T.C_PRIMARY_DARK
                             SectionLabel:
-                                title: 'ELIGE EL DÍA (MÁXIMO 3)'
+                                title: 'ELIGE EL DÍA (MÁXIMO %d)' % app.permit_max_days
                             GlassCard:
                                 orientation: 'vertical'
                                 size_hint_y: None
@@ -2339,6 +2345,7 @@
                                 padding: dp(14)
                                 CalendarPicker:
                                     id: calendar
+                                    max_days: app.permit_max_days
                                     on_range_change: root.refresh()
                             Txt:
                                 text: root.error

@@ -422,3 +422,16 @@ tres tamaños. Durante la prueba aparecieron y se corrigieron dos fallos
 previos: el separador de cada fila de "Liquidaciones recientes" era un hijo
 de un BoxLayout horizontal (ocupaba una columna a la derecha) y la ficha
 naranja del banner vacío quedaba dibujada en la esquina de la ventana.
+
+### Más parámetros de Remote Config
+
+Pregunta del estudiante: ¿Remote Config solo hacía eso (3 valores)? La IA
+amplió el catálogo con 7 parámetros que gobiernan las funciones nuevas:
+`vacation_balance`, `permit_max_days`, `min_password_length`,
+`review_delay_seconds` y 3 feature flags (`enable_vacations/permits/licenses`).
+Decisión de diseño: el largo mínimo de contraseña rige solo al registrarse
+(si también rigiera en el login, subirlo dejaría fuera a cuentas existentes).
+Cada valor tiene rango válido; uno inválido se ignora. Probado en headless:
+cambio de cada valor con la app abierta, valores inválidos/fuera de rango,
+flags apagados y encendidos, y la regresión completa a dos tamaños.
+

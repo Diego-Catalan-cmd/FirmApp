@@ -317,6 +317,18 @@ Local vs. Parámetros Remotos"):
   - `show_desktop_cta` (bool) — feature flag: enciende/apaga la tarjeta
     "Firmar sin sesión".
   - `max_recent_docs` (int) — límite numérico de liquidaciones a listar.
+  - Políticas de las funciones de RR.HH. (enteros, con rango válido):
+    `vacation_balance` (0-60, días de vacaciones disponibles; cambia el
+    "días libres" del Inicio y el tope del calendario), `permit_max_days`
+    (1-5, máximo de días de un permiso), `min_password_length` (4-20, largo
+    mínimo al **registrarse**; el login no lo exige) y `review_delay_seconds`
+    (1-120, cuánto tarda la respuesta simulada de RR.HH.).
+  - Feature flags (booleanos): `enable_vacations`, `enable_permits`,
+    `enable_licenses` — con `false`, la tarjeta de Acciones Rápidas se apaga
+    ("No disponible por ahora") sin reinstalar la app.
+
+  Un valor fuera de rango o mal tipeado se ignora y se mantiene el anterior
+  (ver `REMOTE_INT_SETTINGS` / `REMOTE_FLAGS` en `main.py`).
 
 Flujo seguro (nunca confiar en la red):
 1. **Default local** — la app arranca completa con `SHOW_DESKTOP_CTA` y

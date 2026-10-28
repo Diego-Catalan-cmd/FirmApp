@@ -1,5 +1,12 @@
 {
-    "banner_message": "Nuevo aawdawd",
+    "banner_message": "Nuevo: liquidaciones de octubre ya disponibles",
     "show_desktop_cta": true,
-    "max_recent_docs": 3
+    "max_recent_docs": 3,
+    "vacation_balance": 12,
+    "permit_max_days": 3,
+    "min_password_length": 4,
+    "review_delay_seconds": 10,
+    "enable_vacations": true,
+    "enable_permits": true,
+    "enable_licenses": true
 }

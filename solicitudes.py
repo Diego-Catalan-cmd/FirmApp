@@ -158,15 +158,16 @@ def validate_vacation(start, end, reason, available, today=None):
     return (False, err) if err else (True, '')
 
 
-def validate_permit(start, end, reason, today=None):
-    """(ok, mensaje). Un permiso es de 1 a PERMIT_MAX_DAYS dias."""
+def validate_permit(start, end, reason, today=None, max_days=PERMIT_MAX_DAYS):
+    """(ok, mensaje). Un permiso es de 1 a max_days dias (por defecto
+    PERMIT_MAX_DAYS; la app lo recibe por Remote Config)."""
     today = today or date.today()
     if not start or not end:
         return False, 'Elige el día (o los días) en el calendario.'
     if start < today:
         return False, 'No puedes pedir un permiso en fechas pasadas.'
-    if count_days(start, end) > PERMIT_MAX_DAYS:
-        return False, 'Un permiso es de 1 a %d días.' % PERMIT_MAX_DAYS
+    if count_days(start, end) > max_days:
+        return False, 'Un permiso es de 1 a %d días.' % max_days
     err = _check_reason(reason)
     return (False, err) if err else (True, '')
 
