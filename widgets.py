@@ -147,7 +147,31 @@ class SnapshotBackground(MDFloatLayout):
 
 
 # ============================================================== TARJETAS
-class GlassCard(MDBoxLayout):
+class SkipWhenCollapsed:
+    """
+    Un contenedor "oculto" con height = 0 NO esconde a sus hijos: siguen
+    dibujados fuera de su caja (solo se ven transparentes) y, aunque esten
+    disabled, un widget disabled que choca con el toque lo CONSUME -- asi las
+    filas de un menu cerrado tapaban el boton que lo abre. Este mixin hace
+    que un contenedor colapsado (alto <= 1) ignore los toques sin pasarselos
+    a los hijos.
+    """
+    def on_touch_down(self, touch):
+        return False if self.height <= 1 else super().on_touch_down(touch)
+
+    def on_touch_move(self, touch):
+        return False if self.height <= 1 else super().on_touch_move(touch)
+
+    def on_touch_up(self, touch):
+        return False if self.height <= 1 else super().on_touch_up(touch)
+
+
+class CollapsibleBox(SkipWhenCollapsed, MDBoxLayout):
+    """MDBoxLayout que puede colapsar a alto 0 (lista del menu desplegable)."""
+    pass
+
+
+class GlassCard(SkipWhenCollapsed, MDBoxLayout):
     """
     Equivalente a .glass-card / .glass-card-dark / .glass-modal del CSS.
 
@@ -321,7 +345,7 @@ class PressCard(Pressable, GlassCard):
         Animation(shadow_strength=2.0 if hovering else 1.0, d=0.15).start(self)
 
 
-class PressableBox(Pressable, MDBoxLayout):
+class PressableBox(Pressable, SkipWhenCollapsed, MDBoxLayout):
     """MDBoxLayout comun (sin el fondo/sombra de GlassCard) que reacciona
     al toque -- para filas simples que deben ser clicables, como el
     banner de notificaciones del Dashboard."""
