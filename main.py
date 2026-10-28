@@ -63,8 +63,24 @@ ENTRY_ANIMATION = True     # animación de entrada al abrir la app
 # reiniciar la app (Activate). Si no hay internet o el archivo no existe
 # todavia en GitHub, la app sigue igual, sin trabarse (Fallback) -- ver
 # remote_config.py y InterfazRRHHApp._apply_remote_config().
+#
+# La app vuelve a pedir este mismo valor cada REMOTE_CONFIG_POLL_INTERVAL
+# segundos (ver build()/_poll_remote_config() mas abajo) -- asi un cambio
+# se refleja solo, sin reiniciar la app. Para la demo en vivo: editar el
+# archivo remoto en GitHub funciona, pero su CDN (raw.githubusercontent.com)
+# puede demorar unos minutos en servir el commit nuevo. Para que el
+# cambio se note al instante durante la defensa (sin hacer push y sin
+# esperar al CDN), apunta esta constante al archivo LOCAL en su lugar:
+#
+#   REMOTE_CONFIG_URL = os.path.join(os.path.dirname(__file__),
+#                                     'remote', 'config.json')
+#
+# remote_config.fetch() detecta que no es una URL http(s) y lo lee
+# directo del disco -- edita ese archivo con el proyecto corriendo y el
+# cambio aparece solo, en el siguiente ciclo de polling.
 REMOTE_CONFIG_URL = ('https://raw.githubusercontent.com/zikness/FirmApp/'
                       'main/remote/config.json')
+REMOTE_CONFIG_POLL_INTERVAL = 5  # segundos entre cada re-consulta
 
 # ------------------------------------------------------------------- DATOS
 # (Igual que en la diapositiva del taller: esto es la "interconexion" de
@@ -581,8 +597,16 @@ class InterfazRRHHApp(MDApp):
         # este mirando la pantalla. Si falla, no pasa nada (ver
         # remote_config.py y _apply_remote_config() mas abajo).
         remote_config.fetch(REMOTE_CONFIG_URL, on_loaded=self._apply_remote_config)
+        # Vuelve a pedir el mismo valor cada pocos segundos (ver comentario
+        # junto a REMOTE_CONFIG_POLL_INTERVAL): asi, si el archivo remoto
+        # cambia mientras la app sigue abierta, el banner/CTA/limite se
+        # actualizan solos, sin reiniciar la app.
+        Clock.schedule_interval(self._poll_remote_config, REMOTE_CONFIG_POLL_INTERVAL)
 
         return self.sm
+
+    def _poll_remote_config(self, dt):
+        remote_config.fetch(REMOTE_CONFIG_URL, on_loaded=self._apply_remote_config)
 
     def _apply_remote_config(self, cfg):
         """Se llama SOLO si remote_config.fetch() trajo un JSON valido

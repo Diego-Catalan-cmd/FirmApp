@@ -315,3 +315,31 @@ integrante del equipo:
   una sección de "Dificultades encontradas".
 - Este archivo se renombró de `uso_ia.md` a `USO_IA.md` (mayúsculas, como
   exige la rúbrica) y se reestructuró en las 6 secciones de esta pauta.
+
+### Remote Config en tiempo real (sin depender de un `git push`)
+
+Pedido del estudiante: *"el remote config debe ser en tiempo real, sin
+tener que hacer push... mientras se ejecuta y modifico el archivo, debe
+reflejarse"*. La primera versión solo pedía el JSON remoto **una vez**,
+al abrir la app. Se agregó:
+
+- `Clock.schedule_interval()` en `InterfazRRHHApp.build()`: vuelve a
+  pedir el mismo valor cada `REMOTE_CONFIG_POLL_INTERVAL` (5 s) mientras
+  la app sigue abierta, sin reiniciarla.
+- `remote_config.fetch()` ahora acepta, además de una URL `http(s)://`,
+  una ruta de archivo local — la lee directo del disco en vez de pedirla
+  por red. Esto se agregó porque `raw.githubusercontent.com` (la fuente
+  remota real del proyecto) cachea el archivo en su CDN por varios
+  minutos tras cada `git push`, lo que hace inviable demostrar un cambio
+  "en vivo" en la defensa. Apuntando `REMOTE_CONFIG_URL` al archivo local
+  (`remote/config.json`) en vez de a GitHub, el mismo mecanismo de
+  polling permite editar ese archivo con la app corriendo y ver el
+  cambio reflejado en la pantalla en el siguiente ciclo (máx. 5
+  segundos), sin ningún `git push` de por medio — ver `README.md`,
+  sección "Remote Config".
+- Probado de extremo a extremo en modo headless (Xvfb): se construyó la
+  app completa, se confirmó el valor inicial del banner, se editó el
+  archivo `remote/config.json` en disco con la app ya corriendo, se
+  forzó un ciclo de polling, y se confirmó que `banner_text` y
+  `max_recent` del Dashboard cambiaron al nuevo valor sin reiniciar el
+  proceso.

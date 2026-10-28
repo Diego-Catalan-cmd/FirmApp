@@ -17,7 +17,9 @@ entrega un dict ya fusionado con los valores por defecto. Quien lo usa
 (main.py) decide que propiedades de la app actualizar con ese dict.
 """
 import json
+import os
 
+from kivy.clock import Clock
 from kivy.network.urlrequest import UrlRequest
 from kivy.logger import Logger
 
@@ -40,6 +42,14 @@ def fetch(url, on_loaded, on_failed=None, timeout=6):
     """
     Pide el JSON remoto en segundo plano. No bloquea la interfaz: Kivy
     sigue dibujando y respondiendo a toques mientras se espera la red.
+
+    Si `url` es una direccion http(s), se pide por red con UrlRequest
+    (fetch asincrono real). Si es una ruta de archivo local (o un
+    `file://...`), se lee directo del disco -- util para probar/demostrar
+    Remote Config en vivo sin depender de que GitHub propague un `git
+    push` (el CDN de raw.githubusercontent.com puede tardar unos minutos
+    en reflejar un commit nuevo). En ambos casos la forma de usarlo desde
+    afuera (main.py) es identica: un dict llega a on_loaded().
 
     on_loaded(dict): se llama SOLO si la respuesta llega y es un objeto
         JSON valido -- recibe DEFAULTS fusionado con lo que trajo el
@@ -94,5 +104,27 @@ def fetch(url, on_loaded, on_failed=None, timeout=6):
         if on_failed:
             on_failed()
 
-    UrlRequest(url, on_success=_on_success, on_error=_on_error,
-               on_failure=_on_failure, timeout=timeout)
+    ruta_local = url[len('file://'):] if url.startswith('file://') else url
+    es_url_http = url.startswith('http://') or url.startswith('https://')
+
+    if es_url_http:
+        UrlRequest(url, on_success=_on_success, on_error=_on_error,
+                   on_failure=_on_failure, timeout=timeout)
+        return
+
+    # Fuente local (archivo de configuracion en disco): se lee de forma
+    # sincrona -- es solo E/S local, no hay por que esperar un hilo de red
+    # -- pero el resultado se entrega via Clock.schedule_once para que
+    # on_loaded()/on_failed() siempre se llamen "en el siguiente tick",
+    # igual que si hubieran venido de UrlRequest (asi quien llama a
+    # fetch() no distingue un caso del otro).
+    try:
+        with open(ruta_local, 'r', encoding='utf-8') as f:
+            contenido = f.read()
+    except (IOError, OSError) as exc:
+        Logger.warning('RemoteConfig: no se pudo leer "%s" (%s) -- se '
+                        'mantiene el valor local (Fallback)', ruta_local, exc)
+        if on_failed:
+            Clock.schedule_once(lambda dt: on_failed(), 0)
+        return
+    Clock.schedule_once(lambda dt: _aplicar(contenido), 0)

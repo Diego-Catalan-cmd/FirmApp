@@ -214,10 +214,33 @@ Flujo seguro (nunca confiar en la red):
 4. **Fallback** — si no hay red, el archivo no existe o viene mal formado,
    no se llama a nada y la app sigue con el Default local, sin trabarse.
 
-Para cambiar un valor remoto en vivo (por ejemplo, en la "Modificación en
-vivo" de la defensa): edita `remote/config.json`, haz commit y push a
-`main` — la próxima vez que se abra la app (sin recompilar nada), toma el
-nuevo valor.
+**Se refleja en vivo, sin reiniciar la app:** `InterfazRRHHApp.build()`
+agenda `Clock.schedule_interval(self._poll_remote_config,
+REMOTE_CONFIG_POLL_INTERVAL)` (cada 5 segundos por defecto) — la app
+vuelve a pedir el mismo valor mientras sigue abierta, así que un cambio
+en la fuente remota se nota solo, sin tener que cerrar y volver a abrir
+la app.
+
+Hay dos formas de cambiar el valor remoto:
+- **Subiéndolo a GitHub** (la fuente real del proyecto): editar
+  `remote/config.json`, hacer commit y push a `main`. Funciona, pero
+  `raw.githubusercontent.com` cachea el archivo en su CDN y puede tardar
+  unos minutos en servir el commit nuevo — nada práctico para la
+  "modificación en vivo" de la defensa.
+- **Editando el archivo local directamente, sin ningún `git push`**
+  (recomendado para la demo): `remote_config.fetch()` acepta tanto una
+  URL `http(s)://` (la usa con `UrlRequest`, asíncrono) como una ruta de
+  archivo local (la lee directo del disco). Para esto, en `main.py` se
+  cambia la constante `REMOTE_CONFIG_URL` para que apunte al archivo
+  local en vez de a GitHub:
+  ```python
+  REMOTE_CONFIG_URL = os.path.join(os.path.dirname(__file__),
+                                    'remote', 'config.json')
+  ```
+  Con la app corriendo, basta editar y guardar ese `remote/config.json`
+  con cualquier editor de texto — en el siguiente ciclo de polling (máx.
+  5 segundos después) el banner/CTA/límite cambian solos en la pantalla,
+  sin recompilar ni reiniciar nada.
 
 ## Notificaciones (Plyer)
 
